@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 
+import pytest
 from django.core.management import call_command
 from django.test import Client
 
@@ -49,6 +50,7 @@ def test_production_settings_come_from_the_environment():
     result = load_settings(
         DJANGO_DEBUG="false",
         DJANGO_SECRET_KEY="s3cret",
+        POSTGRES_PASSWORD="db-pass",
         DJANGO_ALLOWED_HOSTS="logbook.tail1234.ts.net, localhost",
         DJANGO_CSRF_TRUSTED_ORIGINS="https://logbook.tail1234.ts.net",
     )
@@ -61,7 +63,9 @@ def test_production_settings_come_from_the_environment():
 
 
 def test_production_cookies_are_secure_and_proxy_https_is_trusted():
-    result = load_settings(DJANGO_DEBUG="false", DJANGO_SECRET_KEY="s3cret")
+    result = load_settings(
+        DJANGO_DEBUG="false", DJANGO_SECRET_KEY="s3cret", POSTGRES_PASSWORD="db-pass"
+    )
 
     loaded = json.loads(result.stdout)
     assert loaded["SESSION_COOKIE_SECURE"] is True
@@ -89,3 +93,49 @@ def test_static_files_and_icons_are_served_after_collectstatic(settings, tmp_pat
 
     assert css.status_code == 200
     assert icon.status_code == 200
+
+
+def test_production_refuses_an_empty_secret_key():
+    # Compose passes an unset DJANGO_SECRET_KEY through as an empty string.
+    result = load_settings(DJANGO_DEBUG="false", DJANGO_SECRET_KEY="")
+
+    assert result.returncode != 0
+    assert "DJANGO_SECRET_KEY" in result.stderr
+
+
+PRODUCTION = {"DJANGO_DEBUG": "false"}
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {},  # unset
+        {"DJANGO_SECRET_KEY": ""},  # Compose passes an unset variable as empty
+        {"DJANGO_SECRET_KEY": "change-me"},  # the .env.example placeholder
+    ],
+)
+def test_production_refuses_a_missing_or_placeholder_secret_key(env):
+    result = load_settings(**PRODUCTION, **env, POSTGRES_PASSWORD="db-pass")
+
+    assert result.returncode != 0
+    assert "DJANGO_SECRET_KEY" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {},  # unset
+        {"POSTGRES_PASSWORD": ""},  # Compose passes an unset variable as empty
+        {"POSTGRES_PASSWORD": "logbook"},  # the development default
+        {"POSTGRES_PASSWORD": "change-me"},  # the .env.example placeholder
+    ],
+)
+def test_production_refuses_a_missing_default_or_placeholder_db_password(env):
+    result = load_settings(**PRODUCTION, DJANGO_SECRET_KEY="s3cret", **env)
+
+    assert result.returncode != 0
+    assert "POSTGRES_PASSWORD" in result.stderr
+
+
+def test_development_keeps_its_default_database_password():
+    assert load_settings().returncode == 0
