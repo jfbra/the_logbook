@@ -1,0 +1,30 @@
+{% extends "logbook/base.html" %}
+{% block title %}The Logbook{% endblock %}
+{% block content %}
+  <h1>Sessions</h1>
+  <p class="summary"><span>This week: {{ this_week_minutes }} min</span> <span>Last week: {{ last_week_minutes }} min</span></p>
+  <div class="actions">
+    <a class="button primary" href="{% url 'session_create' %}">Log a Session</a>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+  </div>
+  {% if sessions %}
+    <table>
+      <thead><tr><th>Date</th><th>Type</th><th>Duration (min)</th><th>Effort</th><th>Location</th><th>Setting</th><th></th></tr></thead>
+      <tbody>
+      {% for session in sessions %}
+        <tr>
+          <td data-label="Date">{{ session.date|date:"Y-m-d" }}</td>
+          <td data-label="Type">{{ session.get_activity_type_display }}</td>
+          <td data-label="Duration (min)">{{ session.duration_minutes|default_if_none:"" }}</td>
+          <td data-label="Effort">{{ session.effort|default_if_none:"" }}</td>
+          <td data-label="Location">{{ session.location }}</td>
+          <td data-label="Setting">{{ session.get_indoor_outdoor_display }}</td>
+          <td><a class="button" href="{% url 'session_edit' session.pk %}">Edit</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No Sessions yet.</p>
+  {% endif %}
+{% endblock %}

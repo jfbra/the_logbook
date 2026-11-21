@@ -1,0 +1,10 @@
+{% extends "logbook/base.html" %}
+{% block title %}Sign in - The Logbook{% endblock %}
+{% block content %}
+  <h1>Sign in</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions"><button class="primary" type="submit">Sign in</button></div>
+  </form>
+{% endblock %}

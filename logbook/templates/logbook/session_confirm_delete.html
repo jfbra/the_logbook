@@ -1,0 +1,13 @@
+{% extends "logbook/base.html" %}
+{% block title %}Delete Session - The Logbook{% endblock %}
+{% block content %}
+  <h1>Delete this Session?</h1>
+  <p>{{ session.date|date:"Y-m-d" }} {{ session.get_activity_type_display }}{% if session.location %} at {{ session.location }}{% endif %}</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="actions">
+      <button class="primary" type="submit">Delete</button>
+      <a class="button" href="{% url 'session_list' %}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

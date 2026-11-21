@@ -1,0 +1,14 @@
+{% extends "logbook/base.html" %}
+{% block title %}{{ title }} - The Logbook{% endblock %}
+{% block content %}
+  <h1>{{ title }}</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions">
+      <button class="primary" type="submit">Save</button>
+      <a class="button" href="{% url 'session_list' %}">Cancel</a>
+      {% if session %}<a class="button" href="{% url 'session_delete' session.pk %}">Delete</a>{% endif %}
+    </div>
+  </form>
+{% endblock %}

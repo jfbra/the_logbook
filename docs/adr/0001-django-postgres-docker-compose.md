@@ -1,0 +1,3 @@
+# Django + Postgres, deployed via Docker Compose on a homelab VM
+
+The Logbook is a single-user web app that must grow from a climbing MVP into a multi-sport data hub, run on the owner's own homelab (Docker Compose on Proxmox VMs), and be reachable privately over Tailscale. We chose Django for its built-in auth and admin, and Postgres rather than SQLite so the data layer can absorb later growth (more data sources, heavier analytics, possibly more users) without a migration of database engine. SQLite would have been simpler for one user today; we accepted the extra container to avoid a later switch.
