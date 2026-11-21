@@ -3,12 +3,17 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import SessionForm
 from .models import Session
+from .weekly import weekly_totals
 
 
 def session_list(request: HttpRequest) -> HttpResponse:
-    return render(
-        request, "logbook/session_list.html", {"sessions": Session.objects.all()}
-    )
+    this_week, last_week = weekly_totals()
+    context = {
+        "sessions": Session.objects.all(),
+        "this_week_minutes": this_week,
+        "last_week_minutes": last_week,
+    }
+    return render(request, "logbook/session_list.html", context)
 
 
 def _session_form_view(

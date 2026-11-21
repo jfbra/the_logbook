@@ -9,6 +9,7 @@
   <h1>Sessions</h1>
   <p><a href="{% url 'session_create' %}">Log a Session</a></p>
   <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+  <p>This week: {{ this_week_minutes }} min &middot; Last week: {{ last_week_minutes }} min</p>
   {% if sessions %}
     <table>
       <thead><tr><th>Date</th><th>Type</th><th>Duration (min)</th><th>Effort</th><th>Location</th><th>Setting</th><th></th></tr></thead>
