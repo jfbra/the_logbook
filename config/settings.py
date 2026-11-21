@@ -30,18 +30,29 @@ def _env_list(name: str) -> list[str]:
     ]
 
 
+def _require_real_secret(name: str, *insecure: str) -> str:
+    """A production secret that must be set to something other than a known
+    placeholder. Compose passes an unset variable through as an empty string, and
+    .env.example ships "change-me", so both count as not set."""
+    value = os.environ.get(name, "")
+    if value in {"", "change-me", *insecure}:
+        raise ImproperlyConfigured(
+            f"{name} must be set to a real value when DJANGO_DEBUG is false"
+        )
+    return value
+
+
 # Development is the default (no environment needed). Production sets
-# DJANGO_DEBUG=false and must then supply DJANGO_SECRET_KEY.
+# DJANGO_DEBUG=false and must then supply DJANGO_SECRET_KEY and POSTGRES_PASSWORD.
 DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() in {"1", "true", "yes", "on"}
 
 if DEBUG:
     SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-insecure-secret-key")
+    DATABASE_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "logbook")
 else:
-    SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
-    if not SECRET_KEY:
-        raise ImproperlyConfigured(
-            "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false"
-        )
+    SECRET_KEY = _require_real_secret("DJANGO_SECRET_KEY")
+    # "logbook" is the development default, so it is not acceptable in production.
+    DATABASE_PASSWORD = _require_real_secret("POSTGRES_PASSWORD", "logbook")
 
 ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = _env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
@@ -106,7 +117,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("POSTGRES_DB", "logbook"),
         "USER": os.environ.get("POSTGRES_USER", "logbook"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "logbook"),
+        "PASSWORD": DATABASE_PASSWORD,
         "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }

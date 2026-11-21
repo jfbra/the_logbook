@@ -21,7 +21,8 @@ COPY docker-entrypoint.sh ./
 
 # Collect static files at build time. These values exist only for this command
 # and are not stored in the image environment.
-RUN DJANGO_DEBUG=false DJANGO_SECRET_KEY=build-only python manage.py collectstatic --noinput
+RUN DJANGO_DEBUG=false DJANGO_SECRET_KEY=build-only POSTGRES_PASSWORD=build-only \
+    python manage.py collectstatic --noinput
 
 RUN useradd --system --create-home app \
     && chmod +x docker-entrypoint.sh

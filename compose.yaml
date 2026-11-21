@@ -11,7 +11,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-logbook}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-logbook}
     ports:
-      # Host only, for `uv run` in development. Never the whole network.
+      # Only for `uv run` in development; production does not need it. Host only,
+      # never the whole network.
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -30,7 +31,9 @@ services:
     environment:
       # Always production mode here, whatever .env says.
       DJANGO_DEBUG: "false"
-      # Unset values become empty and the app refuses to start (see settings.py).
+      # Unset values become empty and the app refuses to start (see settings.py), so
+      # there is no weak fallback here. Only the db service keeps the dev default
+      # password, so that `docker compose up -d db` works with no .env.
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
@@ -38,7 +41,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-logbook}
       POSTGRES_USER: ${POSTGRES_USER:-logbook}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-logbook}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     ports:
       # Host only: Tailscale serve fronts this. Not published to the network.
       - "127.0.0.1:8000:8000"
