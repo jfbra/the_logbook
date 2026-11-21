@@ -67,3 +67,25 @@ def test_totals_reflect_edits_and_deletes(signed_in_client: Client):
 
     post(signed_in_client, f"/sessions/{pk}/delete/")
     assert "This week: 0 min" in get(signed_in_client, "/").content.decode()
+
+
+def test_editing_a_sessions_date_moves_its_minutes_between_weeks(
+    signed_in_client: Client,
+):
+    day = datetime.timedelta(days=1)
+    log_on(signed_in_client, this_monday(), duration_minutes="40")
+    pk = session_ids(signed_in_client)[0]
+
+    post(
+        signed_in_client,
+        f"/sessions/{pk}/edit/",
+        {
+            "date": (this_monday() - day).isoformat(),
+            "activity_type": "climbing",
+            "duration_minutes": "40",
+        },
+    )
+
+    html = get(signed_in_client, "/").content.decode()
+    assert "This week: 0 min" in html
+    assert "Last week: 40 min" in html

@@ -1,9 +1,15 @@
 import datetime
+from typing import NamedTuple
 
 from django.db.models import Sum
 from django.utils import timezone
 
 from .models import Session
+
+
+class WeeklyTotals(NamedTuple):
+    this_week: int
+    last_week: int
 
 
 def week_start(day: datetime.date) -> datetime.date:
@@ -19,11 +25,12 @@ def _total_minutes(start: datetime.date, end: datetime.date) -> int:
     return total or 0
 
 
-def weekly_totals() -> tuple[int, int]:
-    """(this week, last week) total minutes; weeks run Monday-Sunday, local time."""
+def weekly_totals() -> WeeklyTotals:
+    """This week's and last week's total minutes; weeks run Monday-Sunday, local time."""
     this_monday = week_start(timezone.localdate())
     last_monday = this_monday - datetime.timedelta(days=7)
     next_monday = this_monday + datetime.timedelta(days=7)
-    return _total_minutes(this_monday, next_monday), _total_minutes(
-        last_monday, this_monday
+    return WeeklyTotals(
+        this_week=_total_minutes(this_monday, next_monday),
+        last_week=_total_minutes(last_monday, this_monday),
     )
