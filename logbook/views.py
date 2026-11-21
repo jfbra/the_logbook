@@ -11,26 +11,24 @@ def session_list(request: HttpRequest) -> HttpResponse:
     )
 
 
-def session_create(request: HttpRequest) -> HttpResponse:
-    form = SessionForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        return redirect("session_list")
-    return render(
-        request, "logbook/session_form.html", {"form": form, "title": "Log a Session"}
-    )
-
-
-def session_edit(request: HttpRequest, pk: int) -> HttpResponse:
-    session = get_object_or_404(Session, pk=pk)
+def _session_form_view(
+    request: HttpRequest, title: str, session: Session | None = None
+) -> HttpResponse:
     form = SessionForm(request.POST or None, instance=session)
     if request.method == "POST" and form.is_valid():
         form.save()
         return redirect("session_list")
-    return render(
-        request,
-        "logbook/session_form.html",
-        {"form": form, "title": "Edit Session", "session": session},
+    context = {"form": form, "title": title, "session": session}
+    return render(request, "logbook/session_form.html", context)
+
+
+def session_create(request: HttpRequest) -> HttpResponse:
+    return _session_form_view(request, "Log a Session")
+
+
+def session_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    return _session_form_view(
+        request, "Edit Session", get_object_or_404(Session, pk=pk)
     )
 
 
