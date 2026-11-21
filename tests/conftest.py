@@ -4,8 +4,13 @@ from django.test import Client
 
 
 @pytest.fixture
-def user(db):
-    return get_user_model().objects.create_user("athlete", password="correct-horse")
+def credentials() -> dict[str, str]:
+    return {"username": "athlete", "password": "correct-horse"}
+
+
+@pytest.fixture
+def user(db, credentials):
+    return get_user_model().objects.create_user(**credentials)
 
 
 @pytest.fixture
