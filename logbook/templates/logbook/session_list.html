@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Logbook</title>
+</head>
+<body>
+  <h1>Sessions</h1>
+  {% if sessions %}
+    <ul>{% for session in sessions %}<li>{{ session }}</li>{% endfor %}</ul>
+  {% else %}
+    <p>No Sessions yet.</p>
+  {% endif %}
+</body>
+</html>
