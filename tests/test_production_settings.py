@@ -89,3 +89,11 @@ def test_static_files_and_icons_are_served_after_collectstatic(settings, tmp_pat
 
     assert css.status_code == 200
     assert icon.status_code == 200
+
+
+def test_production_refuses_an_empty_secret_key():
+    # Compose passes an unset DJANGO_SECRET_KEY through as an empty string.
+    result = load_settings(DJANGO_DEBUG="false", DJANGO_SECRET_KEY="")
+
+    assert result.returncode != 0
+    assert "DJANGO_SECRET_KEY" in result.stderr

@@ -37,12 +37,11 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() in {"1", "true", "yes", "
 if DEBUG:
     SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-insecure-secret-key")
 else:
-    try:
-        SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
-    except KeyError:
+    SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+    if not SECRET_KEY:
         raise ImproperlyConfigured(
             "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false"
-        ) from None
+        )
 
 ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = _env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
@@ -108,7 +107,7 @@ DATABASES = {
         "NAME": os.environ.get("POSTGRES_DB", "logbook"),
         "USER": os.environ.get("POSTGRES_USER", "logbook"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "logbook"),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+        "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }
 }

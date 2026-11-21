@@ -30,7 +30,7 @@ Development needs no environment variables. Production sets these:
 | `DJANGO_ALLOWED_HOSTS` | empty | Comma-separated hostnames, e.g. `logbook.tailnet-name.ts.net`. |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | empty | Comma-separated origins including scheme, e.g. `https://logbook.tailnet-name.ts.net`. |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `logbook` | Database credentials. |
-| `POSTGRES_HOST`, `POSTGRES_PORT` | `localhost`, `5432` | Database location. |
+| `POSTGRES_HOST`, `POSTGRES_PORT` | `127.0.0.1`, `5432` | Database location. `127.0.0.1` rather than `localhost` because the Compose database port is bound to IPv4 loopback only. |
 
 With `DJANGO_DEBUG=false`, session and CSRF cookies are marked secure and the app trusts
 `X-Forwarded-Proto` from the proxy (Tailscale serve). Static files are served by WhiteNoise
@@ -55,3 +55,24 @@ Create the login account in the running container (first run only):
 ```
 docker exec -it logbook python manage.py createsuperuser
 ```
+
+## Production with Docker Compose
+
+One Compose file runs both workflows. In development you start only the database
+(`docker compose up -d db`). In production it runs the app and Postgres together:
+
+```
+cp .env.example .env         # then edit .env: secret key, hostname, database password
+docker compose up -d --build
+docker compose exec app python manage.py createsuperuser   # first run only
+```
+
+- `.env` is git-ignored; `.env.example` documents every variable.
+- The app (`127.0.0.1:8000`) and Postgres (`127.0.0.1:5432`) are bound to the host only, so
+  nothing is published to the network. Tailscale serve fronts the app (see #14).
+- The stack always runs the app with `DJANGO_DEBUG=false`. If `DJANGO_SECRET_KEY` is missing
+  the app container exits with an `ImproperlyConfigured` error (see `docker compose logs app`).
+- Postgres data lives in the `pgdata` volume, so it survives `docker compose down`, image
+  rebuilds and redeploys. `docker compose down -v` deletes it, so don't use `-v` in production.
+- Port 8000 or 5432 already in use on the host (for example a local `runserver`)? Stop that
+  first, because the ports are fixed.
