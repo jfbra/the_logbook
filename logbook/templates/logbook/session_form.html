@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Log a Session - The Logbook</title>
+  <title>{{ title }} - The Logbook</title>
 </head>
 <body>
-  <h1>Log a Session</h1>
+  <h1>{{ title }}</h1>
   <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
     <button type="submit">Save</button>
     <a href="{% url 'session_list' %}">Cancel</a>
+    {% if session %}<a href="{% url 'session_delete' session.pk %}">Delete</a>{% endif %}
   </form>
 </body>
 </html>
