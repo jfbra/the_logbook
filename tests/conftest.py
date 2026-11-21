@@ -10,7 +10,7 @@ def credentials() -> dict[str, str]:
 
 @pytest.fixture
 def user(db, credentials):
-    return get_user_model().objects.create_user(**credentials)
+    return get_user_model().objects.create_user(**credentials)  # pyright: ignore[reportAttributeAccessIssue]
 
 
 @pytest.fixture
