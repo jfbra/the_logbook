@@ -1,16 +1,10 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in - The Logbook</title>
-</head>
-<body>
+{% extends "logbook/base.html" %}
+{% block title %}Sign in - The Logbook{% endblock %}
+{% block content %}
   <h1>Sign in</h1>
   <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit">Sign in</button>
+    <div class="actions"><button class="primary" type="submit">Sign in</button></div>
   </form>
-</body>
-</html>
+{% endblock %}

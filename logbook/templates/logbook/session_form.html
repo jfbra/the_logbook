@@ -1,18 +1,14 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title }} - The Logbook</title>
-</head>
-<body>
+{% extends "logbook/base.html" %}
+{% block title %}{{ title }} - The Logbook{% endblock %}
+{% block content %}
   <h1>{{ title }}</h1>
   <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit">Save</button>
-    <a href="{% url 'session_list' %}">Cancel</a>
-    {% if session %}<a href="{% url 'session_delete' session.pk %}">Delete</a>{% endif %}
+    <div class="actions">
+      <button class="primary" type="submit">Save</button>
+      <a class="button" href="{% url 'session_list' %}">Cancel</a>
+      {% if session %}<a class="button" href="{% url 'session_delete' session.pk %}">Delete</a>{% endif %}
+    </div>
   </form>
-</body>
-</html>
+{% endblock %}

@@ -1,17 +1,13 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Delete Session - The Logbook</title>
-</head>
-<body>
+{% extends "logbook/base.html" %}
+{% block title %}Delete Session - The Logbook{% endblock %}
+{% block content %}
   <h1>Delete this Session?</h1>
   <p>{{ session.date|date:"Y-m-d" }} {{ session.get_activity_type_display }}{% if session.location %} at {{ session.location }}{% endif %}</p>
   <form method="post">
     {% csrf_token %}
-    <button type="submit">Delete</button>
-    <a href="{% url 'session_list' %}">Cancel</a>
+    <div class="actions">
+      <button class="primary" type="submit">Delete</button>
+      <a class="button" href="{% url 'session_list' %}">Cancel</a>
+    </div>
   </form>
-</body>
-</html>
+{% endblock %}
