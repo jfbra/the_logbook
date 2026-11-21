@@ -3,7 +3,6 @@
 .venv
 .env
 .env.*
-!.env.example
 staticfiles
 __pycache__
 *.pyc
@@ -12,7 +11,7 @@ __pycache__
 .vscode
 tests
 docs
+# Markdown is excluded, including README.md which pyproject.toml names as the
+# project readme. That is fine only because the Dockerfile installs with
+# `uv sync --no-install-project`; drop that flag and this must change too.
 *.md
-compose.yaml
-Dockerfile
-.dockerignore

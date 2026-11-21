@@ -34,21 +34,21 @@ Development needs no environment variables. Production sets these:
 
 With `DJANGO_DEBUG=false`, session and CSRF cookies are marked secure and the app trusts
 `X-Forwarded-Proto` from the proxy (Tailscale serve). Static files are served by WhiteNoise
-from `staticfiles/`; run `uv run python manage.py collectstatic` to populate it.
+from `staticfiles/`; run `uv run python manage.py collectstatic` to populate it (the container image does this at build time, see below).
 
 ## Container image
 
 ```
 docker build -t the-logbook .
-docker run -d --name logbook --network the_logbook_default -p 8000:8000 \
+docker run -d --name logbook --network the_logbook_default -p 127.0.0.1:8000:8000 \
   -e DJANGO_DEBUG=false -e DJANGO_SECRET_KEY=<secret> \
   -e DJANGO_ALLOWED_HOSTS=<hostname> -e DJANGO_CSRF_TRUSTED_ORIGINS=https://<hostname> \
   -e POSTGRES_HOST=db -e POSTGRES_PASSWORD=<password> the-logbook
 ```
 
-The image runs gunicorn as a non-root user, applies migrations on start and ships with
+The image runs gunicorn as a non-root user, applies migrations on every start (`python manage.py migrate`, so it needs a reachable database) and ships with
 static files already collected. No secrets are baked in: everything comes from the
-environment variables above. The Compose production setup (#13) wires this together.
+environment variables listed under Configuration, including `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PORT`. The port is bound to `127.0.0.1` so the app is only reachable from the host (Tailscale fronts it). The Compose production setup (#13) wires this together.
 
 Create the login account in the running container (first run only):
 
