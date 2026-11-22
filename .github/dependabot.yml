@@ -1,0 +1,10 @@
+# Keeps the SHA-pinned actions in .github/workflows current. Dependabot
+# rewrites the SHA and updates the trailing "# vX.Y.Z" comment.
+# GitHub Actions only: Python packages and other ecosystems are deliberately
+# not covered.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
