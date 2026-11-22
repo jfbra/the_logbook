@@ -1,0 +1,15 @@
+{% extends "logbook/base.html" %}
+{% block title %}Edit Ascent - The Logbook{% endblock %}
+{% block content %}
+  <h1>Edit Ascent</h1>
+  <p><strong>{{ ascent.route.name }}</strong>{% if ascent.route.grade %} ({{ ascent.route.grade }}){% endif %} &middot; {{ ascent.route.get_route_type_display }}</p>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions">
+      <button class="primary" type="submit">Save</button>
+      <a class="button" href="{% url 'session_detail' ascent.session_id %}">Cancel</a>
+      <a class="button" href="{% url 'ascent_delete' ascent.pk %}">Delete</a>
+    </div>
+  </form>
+{% endblock %}

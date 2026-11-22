@@ -4,7 +4,7 @@
     {% if ascents %}
       <ul>
         {% for ascent in ascents %}
-          <li>{{ ascent.route.name }}{% if ascent.route.grade %} ({{ ascent.route.grade }}){% endif %} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}{% if ascent.rests %} &middot; {{ ascent.rests }} rest{{ ascent.rests|pluralize }}{% endif %}{% if ascent.notes %} &mdash; {{ ascent.notes }}{% endif %}</li>
+          <li><a href="{% url 'ascent_edit' ascent.pk %}">Edit</a> {{ ascent.route.name }}{% if ascent.route.grade %} ({{ ascent.route.grade }}){% endif %} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}{% if ascent.rests %} &middot; {{ ascent.rests }} rest{{ ascent.rests|pluralize }}{% endif %}{% if ascent.notes %} &mdash; {{ ascent.notes }}{% endif %}</li>
         {% endfor %}
       </ul>
     {% else %}
