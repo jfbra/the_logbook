@@ -100,3 +100,36 @@ docker compose exec app python manage.py createsuperuser   # first run only
   rebuilds and redeploys. `docker compose down -v` deletes it, so don't use `-v` in production.
 - Port 8000 or 5432 already in use on the host (for example a local `runserver`)? Stop that
   first, because the ports are fixed.
+
+## Manual deploy and rollback (interim)
+
+Until the deploy workflow exists, deploy by hand on the VM. This section is replaced when that workflow lands.
+
+**Deploy**
+
+1. Take a database dump first if the new commits include a migration (check with `git diff --stat HEAD origin/master -- '*/migrations/*'`, after `git fetch`):
+
+   ```
+   docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > logbook-$(date +%F).sql
+   ```
+
+   Copy the dump off the VM (for example `scp <vm>:logbook-<date>.sql .`). A dump that only lives on the VM does not protect against losing the VM.
+2. Pull the code and rebuild:
+
+   ```
+   git checkout master && git pull
+   docker compose up -d --build
+   ```
+
+   Migrations run automatically when the app container starts.
+3. Check it worked: `docker compose ps` shows `app` and `db` running, `docker compose logs app` shows no errors, and the login page returns 200 (use a hostname from `DJANGO_ALLOWED_HOSTS`, otherwise Django answers 400):
+
+   ```
+   curl -s -o /dev/null -w '%{http_code}\n' -H "Host: <hostname>" http://127.0.0.1:8000/login/
+   ```
+
+**Roll back**
+
+Check out the older commit (`git checkout <commit>`) and run `docker compose up -d --build` again, then check as above. This is only safe if no migration ran in between, or if the migration was backwards compatible for one release (the old code still works against the new schema). Otherwise restore the pre-deploy dump into a fresh database instead.
+
+**Never** run `docker compose down -v` in production. `-v` deletes the `pgdata` volume, which is all of your data.
