@@ -14,7 +14,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY manage.py ./
+COPY does-not-exist.py ./
 COPY config ./config
 COPY logbook ./logbook
 COPY docker-entrypoint.sh ./
