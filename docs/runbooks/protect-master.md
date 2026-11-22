@@ -40,6 +40,16 @@ Use a throwaway branch and PR. Don't skip this: a ruleset that looks right can s
 - [ ] `git push --force origin master` is rejected.
 - [ ] After merging a PR, its branch is gone from the remote.
 
+## Verification record
+
+Run on 2026-11-22 against ruleset "Protect master" (PR #36 was the throwaway PR):
+
+- Red required check: merge blocked (`mergeStateStatus: BLOCKED`).
+- All checks green: merge allowed.
+- Direct push to `master`: rejected.
+- Force push to `master`: rejected.
+- Merged PR branch auto-deleted.
+
 ## Notes
 
 - The checks are matched by name. If the ruleset UI shows them as `CI / Lint, types and tests`, pick that form. The research in `docs/research/ci-cd.md` couldn't confirm which one applies.
