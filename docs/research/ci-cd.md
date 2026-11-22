@@ -229,3 +229,29 @@ steps:
 ## Researcher's lean (opinion, not sourced)
 
 Start with CI only (job on `pull_request` and `push`, no `paths:` filter, required in a ruleset with 0 approvals), plus Dependabot for actions and SHA pins. Defer automated deploy until backups exist; when adding it, a `workflow_dispatch`/`push`-to-master deploy job in a `production` environment using Tailscale OIDC federation with a tightly scoped `tag:ci` grant is the option that keeps the VM free of inbound exposure and avoids running untrusted code on it. Avoid Watchtower (archived) and a self-hosted runner on a public repo.
+
+---
+
+## Addendum (2026-11-22): Tailscale access policy, tags and SSH
+
+Follow-up research done while planning, to settle questions the first pass could not. Findings come from a researcher's reading of the pages cited; they have not been independently re-read.
+
+### Findings
+- **Default policy** is a single allow-all `acls` rule: `"acls": [{"action":"accept","src":["*"],"dst":["*:*"]}]` (https://tailscale.com/kb/1192/acl-samples). The policy syntax page says `*` as a source means "All traffic originating from Tailscale devices in your tailnet, any approved subnets and autogroup:shared" and recommends grants over acls (https://tailscale.com/kb/1337/policy-syntax). That reads as including tagged devices, so while the allow-all rule stays a tagged CI node can probably reach everything and a narrow rule restricts nothing. **No page states this outright.**
+- **Tags:** "You create a tag by defining it in the tagOwners section of the tailnet policy file"; a tag must exist there before it can be applied. Adding a tag removes the device's user ownership; a device has tags or a user, not both; key expiry is disabled by default; authenticating a device with a user account removes its tags (https://tailscale.com/kb/1068/tags).
+- **Tailscale SSH** is available on all plans. The policy needs both a network rule and an `ssh` rule; an SSH rule from a tagged source cannot be in check mode (use `accept`); a tagged device can SSH to another tagged device. Enable on the host with `tailscale set --ssh` (https://tailscale.com/kb/1193/tailscale-ssh, https://tailscale.com/kb/1337/policy-syntax).
+- **Federated (OIDC) login** with the action uses `oauth-client-id`, `audience` and `tags`, needs `id-token: write`, and needs Tailscale 1.90.1 or later (https://tailscale.com/kb/1581/workload-identity-federation, https://github.com/tailscale/github-action). OAuth clients need the `auth_keys` scope and at least one tag (https://tailscale.com/kb/1215/oauth-clients).
+- **Ephemeral nodes** are auto-removed roughly 30 to 60 minutes after last activity, or immediately on logout (https://tailscale.com/kb/1111/ephemeral-nodes); the action's nodes are ephemeral and log out after the run (action README). The `ping` input waits up to 3 minutes for a connection and accepts a comma-separated host list; `use-cache` defaults on in v4.
+- The Personal plan lists "Up to 50 tagged resources" and "Unlimited user devices" (https://tailscale.com/pricing).
+
+### Not confirmed
+- Whether federated (OIDC) login or OAuth clients are available on the free Personal plan (neither page names a plan or a release status). Check in the admin console under Settings, Trust credentials.
+- That `*` includes tagged devices (inference above).
+- A documented safe procedure for replacing the allow-all rule. A suggested shape, **not from the docs**: keep your own devices on `src: ["autogroup:member"], dst: ["*:*"]`, then add a `tag:ci` rule to the VM's SSH port and an `ssh` rule, adding them beside the allow-all rule first and removing it only after testing.
+- Tailscale SSH from a tagged source to an untagged destination (tagged to tagged is documented), so the VM is tagged too.
+- That `tailscale serve` keeps working after the VM is tagged. Test this straight after tagging.
+- Whether ephemeral CI nodes count against the 50-tagged-resource cap.
+- Plain OpenSSH over the tailnet is not covered by these docs.
+
+### Outcome
+The decisions this research fed are recorded in `docs/adr/0002-push-deploy-over-tailscale-with-ghcr-images.md`.
