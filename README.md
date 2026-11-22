@@ -122,10 +122,10 @@ Until the deploy workflow exists, deploy by hand on the VM. This section is repl
    ```
 
    Migrations run automatically when the app container starts.
-3. Check it worked: `docker compose ps` shows `app` and `db` running, `docker compose logs app` shows no errors, and the login page returns 200:
+3. Check it worked: `docker compose ps` shows `app` and `db` running, `docker compose logs app` shows no errors, and the login page returns 200 (use a hostname from `DJANGO_ALLOWED_HOSTS`, otherwise Django answers 400):
 
    ```
-   curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/login/
+   curl -s -o /dev/null -w '%{http_code}\n' -H "Host: <hostname>" http://127.0.0.1:8000/login/
    ```
 
 **Roll back**
