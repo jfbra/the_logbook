@@ -31,6 +31,8 @@ uv run pyright
 uv run pytest
 ```
 
+A second job, "Production image builds", runs `docker build .` on every run to prove the production image still builds. It does not push the image anywhere. Run it locally with `docker build .`.
+
 CI uses the Python version in `.python-version` and uv 0.13.9 (the same uv as the Dockerfile; update both together). Third-party actions are pinned to full commit SHAs, with the version in a comment.
 
 ## Configuration
