@@ -43,3 +43,12 @@ jobs:
         run: uv run pyright
       - name: Tests
         run: uv run pytest
+
+  image:
+    name: Production image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Build only: nothing is pushed anywhere.
+      - name: Build the production image
+        run: docker build --tag the-logbook:ci .
