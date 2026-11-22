@@ -1,0 +1,9 @@
+{% if candidates %}
+  <ul class="matches">
+    {% for route, last in candidates %}
+      <li><a href="{% url 'ascent_form' session.pk %}?route={{ route.pk }}" hx-get="{% url 'ascent_form' session.pk %}?route={{ route.pk }}" hx-target="#ascents" hx-swap="outerHTML">{{ route.name }}</a>{% if route.grade %} ({{ route.grade }}){% endif %} &middot; {% if last %}last: {{ last.get_result_display }}{% else %}no Ascents yet{% endif %}</li>
+    {% endfor %}
+  </ul>
+{% elif query %}
+  <p>No matching Routes here &mdash; fill in the rest to create a new one.</p>
+{% endif %}

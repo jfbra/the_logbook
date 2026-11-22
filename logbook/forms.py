@@ -1,9 +1,19 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 
-from .models import Ascent, Discipline, GradeSystem, Result, Route, RouteType, Session
+from .models import (
+    DISCIPLINES_BY_ROUTE_TYPE,
+    Ascent,
+    Discipline,
+    GradeSystem,
+    Result,
+    Route,
+    RouteType,
+    Session,
+)
 
 
 class SessionForm(forms.ModelForm):
@@ -26,11 +36,25 @@ class SessionForm(forms.ModelForm):
         self.fields["activity_type"].initial = "climbing"
 
 
-class NewRouteAscentForm(forms.Form):
-    """Quick-add: logs an Ascent of a brand-new Route on an indoor Session."""
+def routes_at(session: Session, query: str = ""):
+    """Routes at the Session's location, name matched ignoring case."""
+    return Route.objects.filter(
+        location=session.location, name__icontains=query.strip()
+    )
 
-    name = forms.CharField(max_length=200, label="Route name")
-    route_type = forms.ChoiceField(choices=RouteType.choices, label="Type")
+
+class AscentForm(forms.Form):
+    """Quick-add: logs an Ascent of an existing Route, or of a new one.
+
+    A name that already exists at the Session's location (ignoring case) reuses
+    that Route rather than creating a duplicate.
+    """
+
+    route = forms.IntegerField(required=False, widget=forms.HiddenInput)
+    name = forms.CharField(max_length=200, required=False, label="Route name")
+    route_type = forms.ChoiceField(
+        choices=RouteType.choices, required=False, label="Type"
+    )
     grade = forms.CharField(max_length=20, required=False)
     grade_system = forms.ChoiceField(
         choices=[("", "Default for type"), *GradeSystem.choices], required=False
@@ -40,32 +64,75 @@ class NewRouteAscentForm(forms.Form):
     rests = forms.IntegerField(min_value=1, required=False)
     notes = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False)
 
-    def __init__(self, *args, session: Session, **kwargs):
+    def __init__(self, *args, session: Session, route: Route | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.session = session
+        self.fields["name"].widget.attrs.update(
+            {
+                "autocomplete": "off",
+                "hx-get": reverse("route_search", args=[session.pk]),
+                "hx-trigger": "input changed delay:250ms",
+                "hx-target": "#route-matches",
+            }
+        )
+        self.chosen: Route | None = route or self._route_from_data()
+        if self.chosen:
+            self.fields["route"].initial = self.chosen.pk
+            allowed = DISCIPLINES_BY_ROUTE_TYPE[RouteType(self.chosen.route_type)]
+            self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]
         if not self.is_bound:
             last = (
                 Ascent.objects.filter(session=session).last()
                 or Ascent.objects.order_by("created_at", "id").last()
             )
             if last:
-                self.fields["discipline"].initial = last.discipline
-                self.fields["route_type"].initial = last.route.route_type
+                if not self.chosen or last.discipline in dict(
+                    self.fields["discipline"].choices  # pyright: ignore[reportAttributeAccessIssue]
+                ):
+                    self.fields["discipline"].initial = last.discipline
+                if not self.chosen:
+                    self.fields["route_type"].initial = last.route.route_type
+
+    def _route_from_data(self) -> Route | None:
+        raw = self.data.get("route") if self.is_bound else None
+        if not raw or not (str(raw).isascii() and str(raw).isdigit()):
+            return None
+        return routes_at(self.session).filter(pk=int(raw)).first()
 
     def clean(self):
         cleaned = super().clean() or {}
         if self.errors:
             return cleaned
-        self._route = Route(
-            name=cleaned["name"].strip(),
-            grade=cleaned["grade"].strip(),
-            grade_system=cleaned["grade_system"],
-            route_type=cleaned["route_type"],
-            location=self.session.location,
-        )
+        route = self.chosen
+        if route is None:
+            name = cleaned["name"].strip()
+            if not name:
+                self.add_error("name", "Route name is required.")
+                return cleaned
+            if not cleaned["route_type"]:
+                self.add_error("route_type", "Choose boulder or roped.")
+                return cleaned
+            existing = (
+                routes_at(self.session).filter(name__iexact=name).order_by("pk").first()
+            )
+            if existing and existing.route_type != cleaned["route_type"]:
+                self.add_error(
+                    "route_type",
+                    f"{existing.name} already exists here as a "
+                    f"{existing.get_route_type_display().lower()} Route.",  # pyright: ignore[reportAttributeAccessIssue]
+                )
+                return cleaned
+            route = existing or Route(
+                name=name,
+                grade=cleaned["grade"].strip(),
+                grade_system=cleaned["grade_system"],
+                route_type=cleaned["route_type"],
+                location=self.session.location,
+            )
+        self._route = route
         self._ascent = Ascent(
             session=self.session,
-            route=self._route,
+            route=route,
             discipline=cleaned["discipline"],
             result=cleaned["result"],
             rests=cleaned["rests"],
@@ -80,7 +147,8 @@ class NewRouteAscentForm(forms.Form):
 
     def save(self) -> Ascent:
         with transaction.atomic():
-            self._route.save()
+            if self._route.pk is None:
+                self._route.save()
             self._ascent.route = self._route
             self._ascent.save()
         return self._ascent

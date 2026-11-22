@@ -1,9 +1,9 @@
-from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import NewRouteAscentForm, SessionForm
-from .models import Session, Setting
+from .forms import AscentForm, SessionForm, routes_at
+from .models import Ascent, Route, Session, Setting
 from .weekly import weekly_totals
 
 
@@ -30,7 +30,7 @@ def _session_form_view(
 
 def _ascent_context(session: Session, form) -> dict:
     if form is None and session.indoor_outdoor == Setting.INDOOR:
-        form = NewRouteAscentForm(session=session)
+        form = AscentForm(session=session)
     return {
         "session": session,
         "form": form,
@@ -50,7 +50,7 @@ def ascent_create(request: HttpRequest, pk: int) -> HttpResponse:
     session = get_object_or_404(Session, pk=pk)
     if session.indoor_outdoor != Setting.INDOOR:
         return HttpResponseBadRequest("Ascents can only be added to indoor Sessions.")
-    form = NewRouteAscentForm(request.POST, session=session)
+    form = AscentForm(request.POST, session=session)
     if form.is_valid():
         form.save()
         form = None
@@ -78,3 +78,36 @@ def session_delete(request: HttpRequest, pk: int) -> HttpResponse:
         session.delete()
         return redirect("session_list")
     return render(request, "logbook/session_confirm_delete.html", {"session": session})
+
+
+def _indoor_session_or_404(pk: int) -> Session:
+    session = get_object_or_404(Session, pk=pk)
+    if session.indoor_outdoor != Setting.INDOOR:
+        raise Http404("Ascents can only be added to indoor Sessions.")
+    return session
+
+
+def route_search(request: HttpRequest, pk: int) -> HttpResponse:
+    """Candidate Routes at the Session's location, with grade and last result."""
+    session = _indoor_session_or_404(pk)
+    query = request.GET.get("name", "").strip()
+    candidates: list[tuple[Route, Ascent | None]] = []
+    if query:
+        for route in routes_at(session, query)[:10]:
+            last = route.ascents.order_by("-created_at", "-id").first()  # pyright: ignore[reportAttributeAccessIssue]
+            candidates.append((route, last))
+    context = {"session": session, "candidates": candidates, "query": query}
+    return render(request, "logbook/_route_matches.html", context)
+
+
+def ascent_form(request: HttpRequest, pk: int) -> HttpResponse:
+    """The quick-add section with an existing Route chosen (or cleared)."""
+    session = _indoor_session_or_404(pk)
+    raw = request.GET.get("route", "")
+    route = (
+        routes_at(session).filter(pk=int(raw)).first()
+        if raw.isascii() and raw.isdigit()
+        else None
+    )
+    form = AscentForm(session=session, route=route)
+    return render(request, "logbook/_ascents.html", _ascent_context(session, form))
