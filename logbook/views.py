@@ -1,3 +1,4 @@
+from django.db.models import Count
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,7 +11,9 @@ from .weekly import weekly_totals
 def session_list(request: HttpRequest) -> HttpResponse:
     totals = weekly_totals()
     context = {
-        "sessions": Session.objects.all(),
+        "sessions": Session.objects.annotate(ascent_count=Count("ascents")).order_by(
+            "-date", "-id"
+        ),
         "this_week_minutes": totals.this_week,
         "last_week_minutes": totals.last_week,
     }
@@ -77,7 +80,8 @@ def session_delete(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         session.delete()
         return redirect("session_list")
-    return render(request, "logbook/session_confirm_delete.html", {"session": session})
+    context = {"session": session, "ascent_count": session.ascents.count()}  # pyright: ignore[reportAttributeAccessIssue]
+    return render(request, "logbook/session_confirm_delete.html", context)
 
 
 def _indoor_session_or_404(pk: int) -> Session:

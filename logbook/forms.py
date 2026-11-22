@@ -35,6 +35,16 @@ class SessionForm(forms.ModelForm):
         self.fields["date"].initial = timezone.localdate
         self.fields["activity_type"].initial = "climbing"
 
+    def clean_indoor_outdoor(self) -> str:
+        setting = self.cleaned_data["indoor_outdoor"]
+        count = self.instance.ascents.count() if self.instance.pk else 0  # pyright: ignore[reportAttributeAccessIssue]
+        if count and setting != self.instance.indoor_outdoor:
+            raise ValidationError(
+                f"The setting cannot be changed because this Session has {count} "
+                f"Ascent{'s' if count != 1 else ''}. Delete them first."
+            )
+        return setting
+
 
 def routes_at(session: Session, query: str = ""):
     """Routes at the Session's location, name matched ignoring case."""
