@@ -1,0 +1,26 @@
+{% extends "logbook/base.html" %}
+{% block title %}Session - The Logbook{% endblock %}
+{% block content %}
+  <h1>{{ session.date|date:"Y-m-d" }} {{ session.get_activity_type_display }}</h1>
+  <dl>
+    <dt>Date</dt><dd>{{ session.date|date:"Y-m-d" }}</dd>
+    <dt>Type</dt><dd>{{ session.get_activity_type_display }}</dd>
+    <dt>Duration (min)</dt><dd>{{ session.duration_minutes|default_if_none:"" }}</dd>
+    <dt>Effort</dt><dd>{{ session.effort|default_if_none:"" }}</dd>
+    <dt>Location</dt><dd>{{ session.location }}</dd>
+    <dt>Setting</dt><dd>{{ session.get_indoor_outdoor_display }}</dd>
+    <dt>Notes</dt><dd>{{ session.notes|linebreaksbr }}</dd>
+  </dl>
+  <div class="actions">
+    <a class="button" href="{% url 'session_edit' session.pk %}">Edit</a>
+    <a class="button" href="{% url 'session_list' %}">Back to Sessions</a>
+  </div>
+  <h2>Ascents</h2>
+  {% if session.indoor_outdoor == "indoor" %}
+    <p>No Ascents yet.</p>
+  {% elif session.indoor_outdoor == "outdoor" %}
+    <p>Outdoor Ascents are not available yet.</p>
+  {% else %}
+    <p>Set this Session as indoor or outdoor to log Ascents. <a href="{% url 'session_edit' session.pk %}">Edit this Session</a></p>
+  {% endif %}
+{% endblock %}

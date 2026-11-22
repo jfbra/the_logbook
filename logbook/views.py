@@ -27,6 +27,11 @@ def _session_form_view(
     return render(request, "logbook/session_form.html", context)
 
 
+def session_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    session = get_object_or_404(Session, pk=pk)
+    return render(request, "logbook/session_detail.html", {"session": session})
+
+
 def session_create(request: HttpRequest) -> HttpResponse:
     return _session_form_view(request, "Log a Session")
 
