@@ -31,7 +31,9 @@ uv run pyright
 uv run pytest
 ```
 
-A second job, "Production image builds", runs `docker build .` on every run to prove the production image still builds. It does not push the image anywhere. Run it locally with `docker build .`.
+A second job, "Production image builds", runs `docker build .` on every run to prove the production image still builds. Run it locally with `docker build .`.
+
+On a push to `master`, once both jobs pass, a third job, "Publish image", builds the production image and pushes it to `ghcr.io/jfbra/the_logbook` tagged `sha-<short commit>`. Pull requests never publish. The package must be public so the VM can pull without credentials: after the first publish, set it to public once under the repository's Packages settings on GitHub (new packages start private). To run a published image, set `APP_IMAGE` in `.env` (see `.env.example`), then `docker compose pull app && docker compose up -d --no-build`.
 
 CI uses the Python version in `.python-version` and uv 0.13.9 (the same uv as the Dockerfile; update both together). Third-party actions are pinned to full commit SHAs, with the version in a comment.
 

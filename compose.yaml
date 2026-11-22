@@ -24,6 +24,10 @@ services:
 
   app:
     build: .
+    # Production can run a published image instead of building: set APP_IMAGE to
+    # ghcr.io/jfbra/the_logbook:sha-<short commit>, then `docker compose pull app` and
+    # `docker compose up -d --no-build`. Unset, `--build` builds and tags it locally.
+    image: ${APP_IMAGE:-the-logbook}
     restart: unless-stopped
     depends_on:
       db:
