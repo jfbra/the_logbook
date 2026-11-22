@@ -31,7 +31,7 @@ uv run pyright
 uv run pytest
 ```
 
-Third-party actions are pinned to full commit SHAs, with the version in a comment.
+CI uses the Python version in `.python-version` and uv 0.13.9 (the same uv as the Dockerfile; update both together). Third-party actions are pinned to full commit SHAs, with the version in a comment.
 
 ## Configuration
 

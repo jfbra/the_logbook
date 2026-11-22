@@ -13,6 +13,7 @@ jobs:
     name: Lint, types and tests
     runs-on: ubuntu-latest
     services:
+      # Mirrors the db service in compose.yaml (Actions cannot read it); keep them in step.
       db:
         image: postgres:17
         env:
