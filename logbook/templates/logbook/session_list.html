@@ -19,7 +19,7 @@
           <td data-label="Effort">{{ session.effort|default_if_none:"" }}</td>
           <td data-label="Location">{{ session.location }}</td>
           <td data-label="Setting">{{ session.get_indoor_outdoor_display }}</td>
-          <td><a class="button" href="{% url 'session_edit' session.pk %}">Edit</a></td>
+          <td><a class="button" href="{% url 'session_detail' session.pk %}">View</a> <a class="button" href="{% url 'session_edit' session.pk %}">Edit</a></td>
         </tr>
       {% endfor %}
       </tbody>
