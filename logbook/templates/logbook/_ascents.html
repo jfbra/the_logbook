@@ -13,7 +13,26 @@
     <form method="post" action="{% url 'ascent_create' session.pk %}" hx-post="{% url 'ascent_create' session.pk %}" hx-target="#ascents" hx-swap="outerHTML">
       {% csrf_token %}
       {{ form.non_field_errors }}
-      {{ form.as_p }}
+      {% if form.chosen %}
+        {{ form.route }}
+        <p><strong>{{ form.chosen.name }}</strong>{% if form.chosen.grade %} ({{ form.chosen.grade }}){% endif %} &middot; {{ form.chosen.get_route_type_display }}
+          <a class="button" href="{% url 'ascent_form' session.pk %}" hx-get="{% url 'ascent_form' session.pk %}" hx-target="#ascents" hx-swap="outerHTML">Change route</a></p>
+        {{ form.discipline.as_field_group }}
+        {{ form.result.as_field_group }}
+        {{ form.rests.as_field_group }}
+        {{ form.notes.as_field_group }}
+      {% else %}
+        {{ form.route }}
+        {{ form.name.as_field_group }}
+        <div id="route-matches"></div>
+        {{ form.route_type.as_field_group }}
+        {{ form.grade.as_field_group }}
+        {{ form.grade_system.as_field_group }}
+        {{ form.discipline.as_field_group }}
+        {{ form.result.as_field_group }}
+        {{ form.rests.as_field_group }}
+        {{ form.notes.as_field_group }}
+      {% endif %}
       <button class="primary" type="submit">Add Ascent</button>
     </form>
   {% elif session.indoor_outdoor == "outdoor" %}
