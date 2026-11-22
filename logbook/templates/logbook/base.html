@@ -8,8 +8,9 @@
   <link rel="manifest" href="{% url 'manifest' %}">
   <link rel="apple-touch-icon" href="{% static 'logbook/apple-touch-icon.png' %}">
   <link rel="stylesheet" href="{% static 'logbook/app.css' %}">
+  <script src="{% static 'logbook/htmx.min.js' %}" defer></script>
 </head>
-<body>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   <main>
     {% block content %}{% endblock %}
   </main>

@@ -1,8 +1,9 @@
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
+from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import SessionForm
-from .models import Session
+from .forms import NewRouteAscentForm, SessionForm
+from .models import Session, Setting
 from .weekly import weekly_totals
 
 
@@ -27,9 +28,38 @@ def _session_form_view(
     return render(request, "logbook/session_form.html", context)
 
 
+def _ascent_context(session: Session, form) -> dict:
+    if form is None and session.indoor_outdoor == Setting.INDOOR:
+        form = NewRouteAscentForm(session=session)
+    return {
+        "session": session,
+        "form": form,
+        "ascents": session.ascents.select_related("route"),  # pyright: ignore[reportAttributeAccessIssue]
+    }
+
+
 def session_detail(request: HttpRequest, pk: int) -> HttpResponse:
     session = get_object_or_404(Session, pk=pk)
-    return render(request, "logbook/session_detail.html", {"session": session})
+    return render(
+        request, "logbook/session_detail.html", _ascent_context(session, None)
+    )
+
+
+@require_POST
+def ascent_create(request: HttpRequest, pk: int) -> HttpResponse:
+    session = get_object_or_404(Session, pk=pk)
+    if session.indoor_outdoor != Setting.INDOOR:
+        return HttpResponseBadRequest("Ascents can only be added to indoor Sessions.")
+    form = NewRouteAscentForm(request.POST, session=session)
+    if form.is_valid():
+        form.save()
+        form = None
+    context = _ascent_context(session, form)
+    if request.headers.get("HX-Request"):
+        return render(request, "logbook/_ascents.html", context)
+    if form is None:
+        return redirect("session_detail", pk=pk)
+    return render(request, "logbook/session_detail.html", context, status=422)
 
 
 def session_create(request: HttpRequest) -> HttpResponse:
