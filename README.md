@@ -19,6 +19,20 @@ Requires the Compose Postgres to be running.
 uv run pytest
 ```
 
+## Continuous integration
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every push to `master`, with no path filters. It installs dependencies exactly from `uv.lock`, then runs ruff lint, ruff format check, pyright and the full test suite against a `postgres:17` service container. Run the same checks locally (with `docker compose up -d db` running):
+
+```
+uv sync --frozen
+uv run ruff check .
+uv run ruff format --check .
+uv run pyright
+uv run pytest
+```
+
+CI uses the Python version in `.python-version` and uv 0.13.9 (the same uv as the Dockerfile; update both together). Third-party actions are pinned to full commit SHAs, with the version in a comment.
+
 ## Configuration
 
 Development needs no environment variables. Production sets these:
