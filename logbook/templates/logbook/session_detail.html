@@ -15,12 +15,5 @@
     <a class="button" href="{% url 'session_edit' session.pk %}">Edit</a>
     <a class="button" href="{% url 'session_list' %}">Back to Sessions</a>
   </div>
-  <h2>Ascents</h2>
-  {% if session.indoor_outdoor == "indoor" %}
-    <p>No Ascents yet.</p>
-  {% elif session.indoor_outdoor == "outdoor" %}
-    <p>Outdoor Ascents are not available yet.</p>
-  {% else %}
-    <p>Set this Session as indoor or outdoor to log Ascents. <a href="{% url 'session_edit' session.pk %}">Edit this Session</a></p>
-  {% endif %}
+  {% include "logbook/_ascents.html" %}
 {% endblock %}

@@ -1,0 +1,24 @@
+<section id="ascents">
+  <h2>Ascents</h2>
+  {% if session.indoor_outdoor == "indoor" %}
+    {% if ascents %}
+      <ul>
+        {% for ascent in ascents %}
+          <li>{{ ascent.route.name }}{% if ascent.route.grade %} ({{ ascent.route.grade }}){% endif %} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}{% if ascent.rests %} &middot; {{ ascent.rests }} rest{{ ascent.rests|pluralize }}{% endif %}{% if ascent.notes %} &mdash; {{ ascent.notes }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No Ascents yet.</p>
+    {% endif %}
+    <form method="post" action="{% url 'ascent_create' session.pk %}" hx-post="{% url 'ascent_create' session.pk %}" hx-target="#ascents" hx-swap="outerHTML">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {{ form.as_p }}
+      <button class="primary" type="submit">Add Ascent</button>
+    </form>
+  {% elif session.indoor_outdoor == "outdoor" %}
+    <p>Outdoor Ascents are not available yet.</p>
+  {% else %}
+    <p>Set this Session as indoor or outdoor to log Ascents. <a href="{% url 'session_edit' session.pk %}">Edit this Session</a></p>
+  {% endif %}
+</section>
