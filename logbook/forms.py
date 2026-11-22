@@ -152,3 +152,18 @@ class AscentForm(forms.Form):
             self._ascent.route = self._route
             self._ascent.save()
         return self._ascent
+
+
+class AscentEditForm(forms.ModelForm):
+    """Edit an existing Ascent; validates exactly like adding (Ascent.clean)."""
+
+    class Meta:
+        model = Ascent
+        fields = ["discipline", "result", "rests", "notes"]
+        widgets = {"notes": forms.Textarea(attrs={"rows": 2})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        allowed = DISCIPLINES_BY_ROUTE_TYPE[RouteType(self.instance.route.route_type)]
+        self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]
+        self.fields["rests"].widget.attrs["min"] = 1

@@ -2,7 +2,7 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadReque
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import AscentForm, SessionForm, routes_at
+from .forms import AscentEditForm, AscentForm, SessionForm, routes_at
 from .models import Ascent, Route, Session, Setting
 from .weekly import weekly_totals
 
@@ -111,3 +111,24 @@ def ascent_form(request: HttpRequest, pk: int) -> HttpResponse:
     )
     form = AscentForm(session=session, route=route)
     return render(request, "logbook/_ascents.html", _ascent_context(session, form))
+
+
+def ascent_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    ascent = get_object_or_404(Ascent.objects.select_related("session", "route"), pk=pk)
+    if ascent.session.indoor_outdoor != Setting.INDOOR:
+        raise Http404("Ascents can only be edited on indoor Sessions.")
+    form = AscentEditForm(
+        request.POST if request.method == "POST" else None, instance=ascent
+    )
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        return redirect("session_detail", pk=ascent.session_id)  # pyright: ignore[reportAttributeAccessIssue]
+    return render(request, "logbook/ascent_form.html", {"form": form, "ascent": ascent})
+
+
+def ascent_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    ascent = get_object_or_404(Ascent.objects.select_related("session", "route"), pk=pk)
+    if request.method == "POST":
+        ascent.delete()
+        return redirect("session_detail", pk=ascent.session_id)  # pyright: ignore[reportAttributeAccessIssue]
+    return render(request, "logbook/ascent_confirm_delete.html", {"ascent": ascent})

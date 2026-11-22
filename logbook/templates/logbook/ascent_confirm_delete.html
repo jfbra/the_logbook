@@ -1,0 +1,13 @@
+{% extends "logbook/base.html" %}
+{% block title %}Delete Ascent - The Logbook{% endblock %}
+{% block content %}
+  <h1>Delete this Ascent?</h1>
+  <p>{{ ascent.route.name }} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="actions">
+      <button class="primary" type="submit">Delete</button>
+      <a class="button" href="{% url 'session_detail' ascent.session_id %}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}
