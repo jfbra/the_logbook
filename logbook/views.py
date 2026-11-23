@@ -3,7 +3,7 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadReque
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import AscentEditForm, AscentForm, SessionForm, routes_at
+from .forms import AscentEditForm, AscentForm, SessionForm, grade_choices, routes_at
 from .models import Ascent, Route, Session, Setting
 from .weekly import weekly_totals
 
@@ -136,3 +136,11 @@ def ascent_delete(request: HttpRequest, pk: int) -> HttpResponse:
         ascent.delete()
         return redirect("session_detail", pk=ascent.session_id)  # pyright: ignore[reportAttributeAccessIssue]
     return render(request, "logbook/ascent_confirm_delete.html", {"ascent": ascent})
+
+
+def grade_options(request: HttpRequest) -> HttpResponse:
+    """The grade <option>s for the chosen Route type and grade system."""
+    choices = grade_choices(
+        request.GET.get("route_type", ""), request.GET.get("grade_system", "")
+    )
+    return render(request, "logbook/_grade_options.html", {"choices": choices})
