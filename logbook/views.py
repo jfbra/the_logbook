@@ -10,6 +10,7 @@ from .forms import (
     GymForm,
     SessionForm,
     grade_choices,
+    result_choices,
     route_by_id,
     routes_at,
 )
@@ -195,4 +196,11 @@ def grade_options(request: HttpRequest) -> HttpResponse:
     choices = grade_choices(
         request.GET.get("route_type", ""), request.GET.get("grade_system", "")
     )
-    return render(request, "logbook/_grade_options.html", {"choices": choices})
+    return render(request, "logbook/_options.html", {"choices": choices})
+
+
+def result_options(request: HttpRequest) -> HttpResponse:
+    """The result <option>s for the chosen Discipline."""
+    choices = result_choices(request.GET.get("discipline", ""))
+    context = {"choices": choices, "selected": request.GET.get("result", "")}
+    return render(request, "logbook/_options.html", context)

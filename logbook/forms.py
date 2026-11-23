@@ -14,6 +14,7 @@ from .models import (
     INDOOR_ROUTE_TYPE_CHOICES,
     IndoorAscent,
     IndoorRoute,
+    RESULTS_BY_DISCIPLINE,
     Result,
     RouteType,
     Session,
@@ -57,6 +58,41 @@ def grade_choices(
     system = grade_system or DEFAULT_GRADE_SYSTEM.get(route_type, GradeSystem.V)  # pyright: ignore[reportArgumentType, reportCallIssue]
     grades = GRADES_BY_SYSTEM.get(str(system), [])
     return [("", "---------"), *((g, g) for g in grades)]
+
+
+def result_choices(discipline: str = "") -> list[tuple[str, str]]:
+    """The Results that suit a Discipline (none for an unknown one)."""
+    try:
+        allowed = RESULTS_BY_DISCIPLINE[Discipline(discipline)]
+    except ValueError:
+        return []
+    return [(r.value, str(r.label)) for r in allowed]
+
+
+def narrow_results(form: forms.BaseForm, discipline: str) -> None:
+    """Offer only the Results for the Discipline, and re-fetch them when it changes.
+
+    Only the rendered options are narrowed; validation still sees every Result so
+    that a mismatch gets the model's explanatory error.
+    """
+    choices = dict(form.fields["discipline"].choices)  # pyright: ignore[reportAttributeAccessIssue]
+    if discipline not in choices:
+        discipline = next(iter(choices), "")
+    shown = result_choices(discipline)
+    current = form.initial.get("result") if not form.is_bound else None
+    if current and current not in dict(shown):
+        # Never silently replace a stored value that no longer fits.
+        shown.append((current, str(dict(Result.choices).get(current, current))))
+    form.fields["result"].widget.choices = shown  # pyright: ignore[reportAttributeAccessIssue]
+    form.fields["discipline"].widget.attrs.update(
+        {
+            "hx-get": reverse("result_options"),
+            "hx-trigger": "change",
+            "hx-target": "#id_result",
+            "hx-swap": "innerHTML",
+            "hx-include": "#id_discipline, #id_result",
+        }
+    )
 
 
 def routes_at(gym_name: str, query: str = ""):
@@ -149,6 +185,13 @@ class AscentForm(forms.Form):
                     self.fields["route_type"].initial = last.route.route_type
                     self.fields["grade"].choices = grade_choices(last.route.route_type)  # pyright: ignore[reportAttributeAccessIssue]
 
+        shown = (
+            self.data.get("discipline", "")
+            if self.is_bound
+            else self.fields["discipline"].initial or ""
+        )
+        narrow_results(self, shown)
+
     def _route_from_data(self) -> IndoorRoute | None:
         return route_by_id(self.data.get("route") if self.is_bound else None)
 
@@ -223,6 +266,12 @@ class AscentEditForm(forms.ModelForm):
         allowed = DISCIPLINES_BY_ROUTE_TYPE[RouteType(self.instance.route.route_type)]
         self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]
         self.fields["rests"].widget.attrs["min"] = 1
+        narrow_results(
+            self,
+            self.data.get("discipline", "")
+            if self.is_bound
+            else self.instance.discipline,
+        )
 
 
 class GymForm(forms.ModelForm):
