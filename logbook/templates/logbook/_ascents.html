@@ -4,7 +4,7 @@
     {% if ascents %}
       <ul>
         {% for ascent in ascents %}
-          <li><a href="{% url 'ascent_edit' ascent.pk %}">Edit</a> {{ ascent.route.name }}{% if ascent.route.grade %} ({{ ascent.route.grade }}){% endif %} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}{% if ascent.rests %} &middot; {{ ascent.rests }} rest{{ ascent.rests|pluralize }}{% endif %}{% if ascent.notes %} &mdash; {{ ascent.notes }}{% endif %}</li>
+          <li><a href="{% url 'ascent_edit' ascent.pk %}">Edit</a> {{ ascent.route.name }}{% if ascent.route.grade %} ({{ ascent.route.grade }}){% endif %} &middot; {{ ascent.route.gym.name }} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}{% if ascent.rests %} &middot; {{ ascent.rests }} rest{{ ascent.rests|pluralize }}{% endif %}{% if ascent.notes %} &mdash; {{ ascent.notes }}{% endif %}</li>
         {% endfor %}
       </ul>
     {% else %}
@@ -15,7 +15,7 @@
       {{ form.non_field_errors }}
       {% if form.chosen %}
         {{ form.route }}
-        <p><strong>{{ form.chosen.name }}</strong>{% if form.chosen.grade %} ({{ form.chosen.grade }}){% endif %} &middot; {{ form.chosen.get_route_type_display }}
+        <p><strong>{{ form.chosen.name }}</strong>{% if form.chosen.grade %} ({{ form.chosen.grade }}){% endif %} &middot; {{ form.chosen.gym.name }} &middot; {{ form.chosen.get_route_type_display }}
           <a class="button" href="{% url 'ascent_form' session.pk %}" hx-get="{% url 'ascent_form' session.pk %}" hx-target="#ascents" hx-swap="outerHTML">Change route</a></p>
         {{ form.discipline.as_field_group }}
         {{ form.result.as_field_group }}
@@ -23,6 +23,7 @@
         {{ form.notes.as_field_group }}
       {% else %}
         {{ form.route }}
+        {{ form.gym.as_field_group }}
         {{ form.name.as_field_group }}
         <div id="route-matches"></div>
         {{ form.route_type.as_field_group }}

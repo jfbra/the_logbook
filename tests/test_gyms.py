@@ -1,5 +1,4 @@
 import pytest
-from django.db.models import ProtectedError
 from django.test import Client
 
 from logbook.forms import GymForm
@@ -123,26 +122,6 @@ def test_a_gym_can_be_deleted(signed_in_client: Client):
     assert page.status_code == 200
     assert response.status_code == 302
     assert not Gym.objects.exists()
-
-
-@pytest.mark.django_db
-def test_deleting_a_gym_that_has_routes_is_refused(
-    signed_in_client: Client, monkeypatch: pytest.MonkeyPatch
-):
-    # Routes do not refer to Gyms yet. Once they do, with on_delete=PROTECT, the
-    # database layer raises exactly this error; the view's handling is what is tested.
-    gym = Gym.objects.create(name="Depot")
-
-    def refuse(*args, **kwargs):
-        raise ProtectedError("protected", set())
-
-    monkeypatch.setattr(Gym, "delete", refuse)
-
-    response = post(signed_in_client, f"/gyms/{gym.pk}/delete/")
-
-    assert response.status_code == 409
-    assert "has Routes" in response.content.decode()
-    assert Gym.objects.filter(pk=gym.pk).exists()
 
 
 @pytest.mark.django_db

@@ -8,12 +8,13 @@ from .grades import GRADES_BY_SYSTEM
 from .models import (
     DEFAULT_GRADE_SYSTEM,
     DISCIPLINES_BY_ROUTE_TYPE,
-    Ascent,
     Discipline,
     GradeSystem,
     Gym,
+    INDOOR_ROUTE_TYPE_CHOICES,
+    IndoorAscent,
+    IndoorRoute,
     Result,
-    Route,
     RouteType,
     Session,
 )
@@ -58,24 +59,36 @@ def grade_choices(
     return [("", "---------"), *((g, g) for g in grades)]
 
 
-def routes_at(session: Session, query: str = ""):
-    """Routes at the Session's location, name matched ignoring case."""
-    return Route.objects.filter(
-        location=session.location, name__icontains=query.strip()
-    )
+def routes_at(gym_name: str, query: str = ""):
+    """IndoorRoutes at the named Gym (ignoring case), name matched ignoring case."""
+    return IndoorRoute.objects.filter(
+        gym__name__iexact=gym_name.strip(), name__icontains=query.strip()
+    ).select_related("gym")
+
+
+def route_by_id(raw: object) -> IndoorRoute | None:
+    """The IndoorRoute with this id, or None for a missing or malformed id."""
+    text = str(raw or "")
+    if not (text.isascii() and text.isdigit()):
+        return None
+    return IndoorRoute.objects.select_related("gym").filter(pk=int(text)).first()
 
 
 class AscentForm(forms.Form):
-    """Quick-add: logs an Ascent of an existing Route, or of a new one.
+    """Quick-add: logs an IndoorAscent of a chosen IndoorRoute, or of a new one.
 
-    A name that already exists at the Session's location (ignoring case) reuses
-    that Route rather than creating a duplicate.
+    A new Route needs a Gym name (created if unknown), a name, a type and a grade.
+    Names are not unique within a Gym, so a new Route is never matched to an
+    existing one by name: the athlete picks a search match instead.
     """
 
     route = forms.IntegerField(required=False, widget=forms.HiddenInput)
+    gym = forms.CharField(max_length=200, required=False, label="Gym")
     name = forms.CharField(max_length=200, required=False, label="Route name")
     route_type = forms.ChoiceField(
-        choices=RouteType.choices, required=False, label="Type"
+        choices=INDOOR_ROUTE_TYPE_CHOICES,
+        required=False,
+        label="Type",
     )
     grade = forms.ChoiceField(required=False)
     grade_system = forms.ChoiceField(
@@ -86,17 +99,20 @@ class AscentForm(forms.Form):
     rests = forms.IntegerField(min_value=1, required=False)
     notes = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False)
 
-    def __init__(self, *args, session: Session, route: Route | None = None, **kwargs):
+    def __init__(
+        self, *args, session: Session, route: IndoorRoute | None = None, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.session = session
-        self.fields["name"].widget.attrs.update(
-            {
-                "autocomplete": "off",
-                "hx-get": reverse("route_search", args=[session.pk]),
-                "hx-trigger": "input changed delay:250ms",
-                "hx-target": "#route-matches",
-            }
-        )
+        search = {
+            "autocomplete": "off",
+            "hx-get": reverse("route_search", args=[session.pk]),
+            "hx-trigger": "input changed delay:250ms",
+            "hx-target": "#route-matches",
+            "hx-include": "#id_gym, #id_name",
+        }
+        self.fields["name"].widget.attrs.update(search)
+        self.fields["gym"].widget.attrs.update(search)
         self.fields["grade"].choices = grade_choices(  # pyright: ignore[reportAttributeAccessIssue]
             self.data.get("route_type", "") if self.is_bound else "",
             self.data.get("grade_system", "") if self.is_bound else "",
@@ -111,7 +127,7 @@ class AscentForm(forms.Form):
                     "hx-include": "#id_route_type, #id_grade_system",
                 }
             )
-        self.chosen: Route | None = route or self._route_from_data()
+        self.chosen: IndoorRoute | None = route or self._route_from_data()
         if self.chosen:
             # The chosen Route already has its grade; ignore any stale posted value.
             self.fields["grade"] = forms.CharField(required=False)
@@ -120,8 +136,8 @@ class AscentForm(forms.Form):
             self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]
         if not self.is_bound:
             last = (
-                Ascent.objects.filter(session=session).last()
-                or Ascent.objects.order_by("created_at", "id").last()
+                IndoorAscent.objects.filter(session=session).last()
+                or IndoorAscent.objects.order_by("created_at", "id").last()
             )
             if last:
                 if not self.chosen or last.discipline in dict(
@@ -129,56 +145,46 @@ class AscentForm(forms.Form):
                 ):
                     self.fields["discipline"].initial = last.discipline
                 if not self.chosen:
+                    self.fields["gym"].initial = last.route.gym.name
                     self.fields["route_type"].initial = last.route.route_type
                     self.fields["grade"].choices = grade_choices(last.route.route_type)  # pyright: ignore[reportAttributeAccessIssue]
 
-    def _route_from_data(self) -> Route | None:
-        raw = self.data.get("route") if self.is_bound else None
-        if not raw or not (str(raw).isascii() and str(raw).isdigit()):
-            return None
-        return routes_at(self.session).filter(pk=int(raw)).first()
+    def _route_from_data(self) -> IndoorRoute | None:
+        return route_by_id(self.data.get("route") if self.is_bound else None)
 
     def clean(self):
         cleaned = super().clean() or {}
         if self.errors:
             return cleaned
         route = self.chosen
+        self._gym: Gym | None = None
         if route is None:
+            gym_name = cleaned["gym"].strip()
             name = cleaned["name"].strip()
+            if not gym_name:
+                self.add_error("gym", "Gym is required.")
             if not name:
                 self.add_error("name", "Route name is required.")
-                return cleaned
             if not cleaned["route_type"]:
-                self.add_error("route_type", "Choose boulder or roped.")
+                self.add_error("route_type", "Choose top-rope, sport or boulder.")
+            if self.errors:
                 return cleaned
-            existing = (
-                routes_at(self.session).filter(name__iexact=name).order_by("pk").first()
-            )
-            if existing and existing.route_type != cleaned["route_type"]:
-                self.add_error(
-                    "route_type",
-                    f"{existing.name} already exists here as a "
-                    f"{existing.get_route_type_display().lower()} Route.",  # pyright: ignore[reportAttributeAccessIssue]
-                )
-                return cleaned
-            route = existing or Route(
+            self._gym = Gym.objects.filter(name__iexact=gym_name).first()
+            route = IndoorRoute(
                 name=name,
                 grade=cleaned["grade"],
                 grade_system=cleaned["grade_system"],
                 route_type=cleaned["route_type"],
-                location=self.session.location,
+                gym=self._gym or Gym(name=gym_name),
             )
-            if existing is None:
-                try:
-                    route.clean()
-                except ValidationError as error:
-                    for field, messages in error.message_dict.items():
-                        self.add_error(
-                            field if field in self.fields else None, messages
-                        )
-                    return cleaned
+            try:
+                route.clean()
+            except ValidationError as error:
+                for field, messages in error.message_dict.items():
+                    self.add_error(field if field in self.fields else None, messages)
+                return cleaned
         self._route = route
-        self._ascent = Ascent(
+        self._ascent = IndoorAscent(
             session=self.session,
             route=route,
             discipline=cleaned["discipline"],
@@ -193,9 +199,11 @@ class AscentForm(forms.Form):
                 self.add_error(field if field in self.fields else None, messages)
         return cleaned
 
-    def save(self) -> Ascent:
+    def save(self) -> IndoorAscent:
         with transaction.atomic():
             if self._route.pk is None:
+                self._gym = self._gym or Gym.objects.named(self._route.gym.name)
+                self._route.gym = self._gym
                 self._route.save()
             self._ascent.route = self._route
             self._ascent.save()
@@ -206,7 +214,7 @@ class AscentEditForm(forms.ModelForm):
     """Edit an existing Ascent; validates exactly like adding (Ascent.clean)."""
 
     class Meta:
-        model = Ascent
+        model = IndoorAscent
         fields = ["discipline", "result", "rests", "notes"]
         widgets = {"notes": forms.Textarea(attrs={"rows": 2})}
 

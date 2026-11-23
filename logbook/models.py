@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.db.models.functions import Lower
 
 from .grades import GRADES_BY_SYSTEM
@@ -39,9 +39,49 @@ class Session(models.Model):
         return f"{self.date} {self.get_activity_type_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
+class GymManager(models.Manager["Gym"]):
+    def named(self, name: str) -> "Gym":
+        """The Gym with this name (ignoring case), created if it does not exist."""
+        name = name.strip()
+        existing = self.filter(name__iexact=name).first()
+        if existing:
+            return existing
+        try:
+            with transaction.atomic():
+                return self.create(name=name)
+        except IntegrityError:
+            # A concurrent request created it first.
+            return self.get(name__iexact=name)
+
+
+class Gym(models.Model):
+    """A climbing gym. Created by name alone; the rest is filled in later."""
+
+    objects = GymManager()
+
+    name = models.CharField(max_length=200)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    website = models.URLField(blank=True)
+
+    class Meta:
+        ordering = [Lower("name"), "id"]
+        constraints = [
+            models.UniqueConstraint(Lower("name"), name="gym_name_unique_ignoring_case")
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class RouteType(models.TextChoices):
+    TOP_ROPE = "top_rope", "Top-rope"
+    SPORT = "sport", "Sport"
     BOULDER = "boulder", "Boulder"
-    ROPED = "roped", "Roped"
+
+
+INDOOR_ROUTE_TYPES = [RouteType.TOP_ROPE, RouteType.SPORT, RouteType.BOULDER]
+INDOOR_ROUTE_TYPE_CHOICES = [(t.value, t.label) for t in INDOOR_ROUTE_TYPES]
 
 
 class GradeSystem(models.TextChoices):
@@ -53,7 +93,8 @@ class GradeSystem(models.TextChoices):
 
 DEFAULT_GRADE_SYSTEM = {
     RouteType.BOULDER: GradeSystem.V,
-    RouteType.ROPED: GradeSystem.EWBANK,
+    RouteType.TOP_ROPE: GradeSystem.EWBANK,
+    RouteType.SPORT: GradeSystem.EWBANK,
 }
 
 
@@ -66,46 +107,49 @@ class Discipline(models.TextChoices):
 class Result(models.TextChoices):
     ONSIGHT = "onsight", "Onsight"
     FLASH = "flash", "Flash"
-    SEND = "send", "Send"
-    REPEAT = "repeat", "Repeat"
-    DAB = "dab", "Dab"
     REDPOINT = "redpoint", "Redpoint"
     DOGGED = "dogged", "Dogged"
-    RETREAT = "retreat", "Retreat"
-    ATTEMPT = "attempt", "Attempt/working"
+    WORKING = "working", "Working"
+    ATTEMPT = "attempt", "Attempt"
+    DAB = "dab", "Dab"
+    REPEAT = "repeat", "Repeat"
+    TICK = "tick", "Tick"
 
 
 DISCIPLINES_BY_ROUTE_TYPE = {
     RouteType.BOULDER: [Discipline.BOULDER],
-    RouteType.ROPED: [Discipline.TOP_ROPE, Discipline.SPORT],
+    RouteType.TOP_ROPE: [Discipline.TOP_ROPE],
+    RouteType.SPORT: [Discipline.SPORT, Discipline.TOP_ROPE],
 }
 
 RESULTS_BY_DISCIPLINE = {
     Discipline.BOULDER: [
-        Result.ONSIGHT, Result.FLASH, Result.SEND, Result.REPEAT, Result.DAB,
-        Result.ATTEMPT,
+        Result.ONSIGHT, Result.FLASH, Result.WORKING, Result.ATTEMPT, Result.DAB,
+        Result.TICK, Result.REPEAT,
     ],
     Discipline.TOP_ROPE: [
-        Result.ONSIGHT, Result.FLASH, Result.REPEAT, Result.DOGGED, Result.RETREAT,
-        Result.ATTEMPT,
+        Result.ONSIGHT, Result.FLASH, Result.DOGGED, Result.WORKING, Result.ATTEMPT,
+        Result.TICK,
     ],
     Discipline.SPORT: [
-        Result.ONSIGHT, Result.FLASH, Result.REDPOINT, Result.DOGGED, Result.RETREAT,
-        Result.ATTEMPT,
+        Result.ONSIGHT, Result.FLASH, Result.REDPOINT, Result.DOGGED, Result.WORKING,
+        Result.ATTEMPT, Result.TICK,
     ],
 }  # fmt: skip
 
 
 class Route(models.Model):
-    """A climb that can be attempted again. Indoor Routes are matched by name per location (reuse arrives in #42)."""
+    """Shared fields and rules of a climb that can be attempted again (abstract)."""
 
     name = models.CharField(max_length=200)
     grade = models.CharField(max_length=20, blank=True)
     grade_system = models.CharField(max_length=10, choices=GradeSystem, blank=True)
     route_type = models.CharField(max_length=10, choices=RouteType)
-    location = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
 
     def __str__(self) -> str:
         return self.name
@@ -131,13 +175,21 @@ class Route(models.Model):
             )
 
 
-class Ascent(models.Model):
-    """One attempt-or-completion of a Route during a Session."""
+class IndoorRoute(Route):
+    """A Route at a Gym. Names repeat after resets, so they are not unique."""
 
-    session = models.ForeignKey(
-        Session, on_delete=models.CASCADE, related_name="ascents"
-    )
-    route = models.ForeignKey(Route, on_delete=models.PROTECT, related_name="ascents")
+    route_type = models.CharField(max_length=10, choices=INDOOR_ROUTE_TYPE_CHOICES)
+    gym = models.ForeignKey(Gym, on_delete=models.PROTECT, related_name="routes")
+    hold_colour = models.CharField(max_length=50, blank=True)
+    date_set = models.DateField(null=True, blank=True)
+
+
+class Ascent(models.Model):
+    """Shared fields and rules of one attempt-or-completion of a Route (abstract).
+
+    Concrete subclasses add `session` and `route`.
+    """
+
     discipline = models.CharField(max_length=10, choices=Discipline)
     result = models.CharField(max_length=10, choices=Result)
     rests = models.PositiveIntegerField(null=True, blank=True)
@@ -146,17 +198,16 @@ class Ascent(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        abstract = True
         ordering = ["created_at", "id"]
 
-    def clean(self) -> None:
+    def clean_discipline_result_rests(self, route: Route) -> dict[str, str]:
         errors: dict[str, str] = {}
-        if self.session.indoor_outdoor != Setting.INDOOR:
-            errors["session"] = "Ascents can only be added to indoor Sessions."
-        allowed = DISCIPLINES_BY_ROUTE_TYPE.get(RouteType(self.route.route_type), [])
+        allowed = DISCIPLINES_BY_ROUTE_TYPE.get(RouteType(route.route_type), [])
         if self.discipline not in allowed:
             errors["discipline"] = (
                 f"{self.get_discipline_display()} does not suit a "  # pyright: ignore[reportAttributeAccessIssue]
-                f"{self.route.get_route_type_display().lower()} Route."  # pyright: ignore[reportAttributeAccessIssue]
+                f"{route.get_route_type_display().lower()} Route."  # pyright: ignore[reportAttributeAccessIssue]
             )
         elif self.result not in RESULTS_BY_DISCIPLINE[Discipline(self.discipline)]:
             errors["result"] = (
@@ -167,23 +218,24 @@ class Ascent(models.Model):
             self.rests = None
         elif self.rests is not None and self.rests < 1:
             errors["rests"] = "Rests must be a positive whole number."
+        return errors
+
+
+class IndoorAscent(Ascent):
+    session = models.ForeignKey(
+        Session, on_delete=models.CASCADE, related_name="ascents"
+    )
+    route = models.ForeignKey(
+        IndoorRoute, on_delete=models.PROTECT, related_name="ascents"
+    )
+
+    class Meta(Ascent.Meta):
+        abstract = False
+
+    def clean(self) -> None:
+        errors: dict[str, str] = {}
+        if self.session.indoor_outdoor != Setting.INDOOR:
+            errors["session"] = "Ascents can only be added to indoor Sessions."
+        errors.update(self.clean_discipline_result_rests(self.route))
         if errors:
             raise ValidationError(errors)
-
-
-class Gym(models.Model):
-    """A climbing gym. Created by name alone; the rest is filled in later."""
-
-    name = models.CharField(max_length=200)
-    city = models.CharField(max_length=100, blank=True)
-    country = models.CharField(max_length=100, blank=True)
-    website = models.URLField(blank=True)
-
-    class Meta:
-        ordering = [Lower("name"), "id"]
-        constraints = [
-            models.UniqueConstraint(Lower("name"), name="gym_name_unique_ignoring_case")
-        ]
-
-    def __str__(self) -> str:
-        return self.name
