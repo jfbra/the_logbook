@@ -1,10 +1,10 @@
-from django.db.models import Count
+from django.db.models import Count, ProtectedError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import AscentEditForm, AscentForm, SessionForm, routes_at
-from .models import Ascent, Route, Session, Setting
+from .forms import AscentEditForm, AscentForm, GymForm, SessionForm, routes_at
+from .models import Ascent, Gym, Route, Session, Setting
 from .weekly import weekly_totals
 
 
@@ -136,3 +136,41 @@ def ascent_delete(request: HttpRequest, pk: int) -> HttpResponse:
         ascent.delete()
         return redirect("session_detail", pk=ascent.session_id)  # pyright: ignore[reportAttributeAccessIssue]
     return render(request, "logbook/ascent_confirm_delete.html", {"ascent": ascent})
+
+
+def gym_list(request: HttpRequest) -> HttpResponse:
+    return render(request, "logbook/gym_list.html", {"gyms": Gym.objects.all()})
+
+
+def _gym_form_view(
+    request: HttpRequest, title: str, gym: Gym | None = None
+) -> HttpResponse:
+    form = GymForm(request.POST or None, instance=gym)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        return redirect("gym_list")
+    context = {"form": form, "title": title, "gym": gym}
+    return render(request, "logbook/gym_form.html", context)
+
+
+def gym_create(request: HttpRequest) -> HttpResponse:
+    return _gym_form_view(request, "Add a Gym")
+
+
+def gym_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    return _gym_form_view(request, "Edit Gym", get_object_or_404(Gym, pk=pk))
+
+
+def gym_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    gym = get_object_or_404(Gym, pk=pk)
+    refused = False
+    if request.method == "POST":
+        try:
+            gym.delete()
+        except ProtectedError:
+            refused = True
+        else:
+            return redirect("gym_list")
+    context = {"gym": gym, "refused": refused}
+    status = 409 if refused else 200
+    return render(request, "logbook/gym_confirm_delete.html", context, status=status)

@@ -9,6 +9,7 @@ from .models import (
     Ascent,
     Discipline,
     GradeSystem,
+    Gym,
     Result,
     Route,
     RouteType,
@@ -177,3 +178,16 @@ class AscentEditForm(forms.ModelForm):
         allowed = DISCIPLINES_BY_ROUTE_TYPE[RouteType(self.instance.route.route_type)]
         self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]
         self.fields["rests"].widget.attrs["min"] = 1
+
+
+class GymForm(forms.ModelForm):
+    class Meta:
+        model = Gym
+        fields = ["name", "city", "country", "website"]
+
+    def clean_name(self) -> str:
+        name = self.cleaned_data["name"].strip()
+        clash = Gym.objects.filter(name__iexact=name).exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise ValidationError(f"A Gym called {clash.first()} already exists.")
+        return name

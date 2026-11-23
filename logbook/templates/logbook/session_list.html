@@ -5,6 +5,7 @@
   <p class="summary"><span>This week: {{ this_week_minutes }} min</span> <span>Last week: {{ last_week_minutes }} min</span></p>
   <div class="actions">
     <a class="button primary" href="{% url 'session_create' %}">Log a Session</a>
+    <a class="button" href="{% url 'gym_list' %}">Gyms</a>
     <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
   </div>
   {% if sessions %}
