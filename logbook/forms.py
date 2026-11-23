@@ -274,6 +274,49 @@ class AscentEditForm(forms.ModelForm):
         )
 
 
+class RouteEditForm(forms.ModelForm):
+    """Edit every attribute of an IndoorRoute, including moving it to another Gym.
+
+    Validates through `IndoorRoute.clean`; the type is locked once it has Ascents.
+    """
+
+    class Meta:
+        model = IndoorRoute
+        fields = [
+            "name",
+            "gym",
+            "route_type",
+            "grade_system",
+            "grade",
+            "stars",
+            "length_m",
+            "description",
+            "setter",
+            "style",
+            "hold_colour",
+            "date_set",
+            "rope_number",
+            "bolts",
+            "area",
+        ]
+        widgets = {
+            "date_set": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def clean_route_type(self) -> str:
+        route_type = self.cleaned_data["route_type"]
+        if (
+            self.instance.pk
+            and route_type != self.instance.route_type
+            and self.instance.ascents.exists()  # pyright: ignore[reportAttributeAccessIssue]
+        ):
+            raise ValidationError(
+                "The Route type cannot be changed because this Route has Ascents."
+            )
+        return route_type
+
+
 class GymForm(forms.ModelForm):
     class Meta:
         model = Gym
