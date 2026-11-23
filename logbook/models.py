@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.db.models.functions import Lower
 
 from .grades import GRADES_BY_SYSTEM
@@ -39,8 +39,25 @@ class Session(models.Model):
         return f"{self.date} {self.get_activity_type_display()}"  # pyright: ignore[reportAttributeAccessIssue]
 
 
+class GymManager(models.Manager["Gym"]):
+    def named(self, name: str) -> "Gym":
+        """The Gym with this name (ignoring case), created if it does not exist."""
+        name = name.strip()
+        existing = self.filter(name__iexact=name).first()
+        if existing:
+            return existing
+        try:
+            with transaction.atomic():
+                return self.create(name=name)
+        except IntegrityError:
+            # A concurrent request created it first.
+            return self.get(name__iexact=name)
+
+
 class Gym(models.Model):
     """A climbing gym. Created by name alone; the rest is filled in later."""
+
+    objects = GymManager()
 
     name = models.CharField(max_length=200)
     city = models.CharField(max_length=100, blank=True)
@@ -64,6 +81,7 @@ class RouteType(models.TextChoices):
 
 
 INDOOR_ROUTE_TYPES = [RouteType.TOP_ROPE, RouteType.SPORT, RouteType.BOULDER]
+INDOOR_ROUTE_TYPE_CHOICES = [(t.value, t.label) for t in INDOOR_ROUTE_TYPES]
 
 
 class GradeSystem(models.TextChoices):
@@ -160,9 +178,7 @@ class Route(models.Model):
 class IndoorRoute(Route):
     """A Route at a Gym. Names repeat after resets, so they are not unique."""
 
-    route_type = models.CharField(
-        max_length=10, choices=[(t.value, t.label) for t in INDOOR_ROUTE_TYPES]
-    )
+    route_type = models.CharField(max_length=10, choices=INDOOR_ROUTE_TYPE_CHOICES)
     gym = models.ForeignKey(Gym, on_delete=models.PROTECT, related_name="routes")
     hold_colour = models.CharField(max_length=50, blank=True)
     date_set = models.DateField(null=True, blank=True)

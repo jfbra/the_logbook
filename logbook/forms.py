@@ -1,6 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
@@ -11,7 +11,7 @@ from .models import (
     Discipline,
     GradeSystem,
     Gym,
-    INDOOR_ROUTE_TYPES,
+    INDOOR_ROUTE_TYPE_CHOICES,
     IndoorAscent,
     IndoorRoute,
     Result,
@@ -66,6 +66,14 @@ def routes_at(gym_name: str, query: str = ""):
     ).select_related("gym")
 
 
+def route_by_id(raw: object) -> IndoorRoute | None:
+    """The IndoorRoute with this id, or None for a missing or malformed id."""
+    text = str(raw or "")
+    if not (text.isascii() and text.isdigit()):
+        return None
+    return IndoorRoute.objects.select_related("gym").filter(pk=int(text)).first()
+
+
 class AscentForm(forms.Form):
     """Quick-add: logs an IndoorAscent of a chosen IndoorRoute, or of a new one.
 
@@ -78,7 +86,7 @@ class AscentForm(forms.Form):
     gym = forms.CharField(max_length=200, required=False, label="Gym")
     name = forms.CharField(max_length=200, required=False, label="Route name")
     route_type = forms.ChoiceField(
-        choices=[(t.value, t.label) for t in INDOOR_ROUTE_TYPES],
+        choices=INDOOR_ROUTE_TYPE_CHOICES,
         required=False,
         label="Type",
     )
@@ -142,10 +150,7 @@ class AscentForm(forms.Form):
                     self.fields["grade"].choices = grade_choices(last.route.route_type)  # pyright: ignore[reportAttributeAccessIssue]
 
     def _route_from_data(self) -> IndoorRoute | None:
-        raw = self.data.get("route") if self.is_bound else None
-        if not raw or not (str(raw).isascii() and str(raw).isdigit()):
-            return None
-        return IndoorRoute.objects.select_related("gym").filter(pk=int(raw)).first()
+        return route_by_id(self.data.get("route") if self.is_bound else None)
 
     def clean(self):
         cleaned = super().clean() or {}
@@ -197,14 +202,7 @@ class AscentForm(forms.Form):
     def save(self) -> IndoorAscent:
         with transaction.atomic():
             if self._route.pk is None:
-                if self._gym is None:
-                    name = self._route.gym.name
-                    try:
-                        with transaction.atomic():
-                            self._gym = Gym.objects.create(name=name)
-                    except IntegrityError:
-                        # A concurrent request created it first.
-                        self._gym = Gym.objects.get(name__iexact=name)
+                self._gym = self._gym or Gym.objects.named(self._route.gym.name)
                 self._route.gym = self._gym
                 self._route.save()
             self._ascent.route = self._route

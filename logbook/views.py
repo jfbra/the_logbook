@@ -10,6 +10,7 @@ from .forms import (
     GymForm,
     SessionForm,
     grade_choices,
+    route_by_id,
     routes_at,
 )
 from .models import Gym, IndoorAscent, IndoorRoute, Session, Setting
@@ -45,7 +46,7 @@ def _ascent_context(session: Session, form) -> dict:
     return {
         "session": session,
         "form": form,
-        "ascents": session.ascents.select_related("route"),  # pyright: ignore[reportAttributeAccessIssue]
+        "ascents": session.ascents.select_related("route__gym"),  # pyright: ignore[reportAttributeAccessIssue]
     }
 
 
@@ -116,19 +117,14 @@ def route_search(request: HttpRequest, pk: int) -> HttpResponse:
 def ascent_form(request: HttpRequest, pk: int) -> HttpResponse:
     """The quick-add section with an existing Route chosen (or cleared)."""
     session = _indoor_session_or_404(pk)
-    raw = request.GET.get("route", "")
-    route = (
-        IndoorRoute.objects.select_related("gym").filter(pk=int(raw)).first()
-        if raw.isascii() and raw.isdigit()
-        else None
-    )
+    route = route_by_id(request.GET.get("route"))
     form = AscentForm(session=session, route=route)
     return render(request, "logbook/_ascents.html", _ascent_context(session, form))
 
 
 def ascent_edit(request: HttpRequest, pk: int) -> HttpResponse:
     ascent = get_object_or_404(
-        IndoorAscent.objects.select_related("session", "route"), pk=pk
+        IndoorAscent.objects.select_related("session", "route__gym"), pk=pk
     )
     if ascent.session.indoor_outdoor != Setting.INDOOR:
         raise Http404("Ascents can only be edited on indoor Sessions.")
@@ -143,7 +139,7 @@ def ascent_edit(request: HttpRequest, pk: int) -> HttpResponse:
 
 def ascent_delete(request: HttpRequest, pk: int) -> HttpResponse:
     ascent = get_object_or_404(
-        IndoorAscent.objects.select_related("session", "route"), pk=pk
+        IndoorAscent.objects.select_related("session", "route__gym"), pk=pk
     )
     if request.method == "POST":
         ascent.delete()

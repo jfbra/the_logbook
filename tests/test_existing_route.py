@@ -203,3 +203,39 @@ def test_deleting_a_gym_that_has_routes_is_refused(
 
     assert response.status_code == 409
     assert Gym.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_search_with_no_name_lists_nothing(signed_in_client: Client, indoor: int):
+    add(signed_in_client, indoor, name="Blue Cave")
+
+    assert "Blue Cave" not in search(signed_in_client, indoor, "")
+
+
+@pytest.mark.django_db
+def test_search_shows_the_last_ascents_result_not_the_first(
+    signed_in_client: Client, indoor: int
+):
+    add(signed_in_client, indoor, name="Blue Cave", result="attempt")
+    route = Route.objects.get()
+    post(
+        signed_in_client,
+        f"/sessions/{indoor}/ascents/new/",
+        {"route": str(route.pk), "discipline": "boulder", "result": "flash"},
+    )
+
+    assert "last: Flash" in search(signed_in_client, indoor, "cave")
+
+
+@pytest.mark.django_db
+def test_ascent_lines_and_the_edit_page_show_the_gym(
+    signed_in_client: Client, indoor: int
+):
+    add(signed_in_client, indoor, gym="Boulder Barn")
+    ascent = Ascent.objects.get()
+
+    page = get(signed_in_client, f"/sessions/{indoor}/").content.decode()
+    edit = get(signed_in_client, f"/ascents/{ascent.pk}/edit/").content.decode()
+
+    assert "Boulder Barn" in page
+    assert "Boulder Barn" in edit
