@@ -15,6 +15,7 @@ urlpatterns = [
     path("ascents/<int:pk>/delete/", views.ascent_delete, name="ascent_delete"),
     path("sessions/<int:pk>/edit/", views.session_edit, name="session_edit"),
     path("sessions/<int:pk>/delete/", views.session_delete, name="session_delete"),
+    path("grades/options/", views.grade_options, name="grade_options"),
     path("login/", auth_views.LoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
 ]

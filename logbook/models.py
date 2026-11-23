@@ -2,6 +2,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from .grades import GRADES_BY_SYSTEM
+
 
 class ActivityType(models.TextChoices):
     """Fixed, code-defined list. Only climbing is enabled for now."""
@@ -108,9 +110,24 @@ class Route(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
+        self.apply_default_grade_system()
+        super().save(*args, **kwargs)
+
+    def apply_default_grade_system(self) -> None:
         if not self.grade_system and self.route_type in DEFAULT_GRADE_SYSTEM:
             self.grade_system = DEFAULT_GRADE_SYSTEM[RouteType(self.route_type)]
-        super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        self.apply_default_grade_system()
+        if not self.grade:
+            raise ValidationError({"grade": "A grade is required."})
+        if self.grade not in GRADES_BY_SYSTEM.get(self.grade_system, []):
+            raise ValidationError(
+                {
+                    "grade": f"{self.grade} is not a "
+                    f"{self.get_grade_system_display()} grade."  # pyright: ignore[reportAttributeAccessIssue]
+                }
+            )
 
 
 class Ascent(models.Model):
