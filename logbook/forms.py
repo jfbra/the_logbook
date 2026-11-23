@@ -4,7 +4,9 @@ from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
+from .grades import GRADES_BY_SYSTEM
 from .models import (
+    DEFAULT_GRADE_SYSTEM,
     DISCIPLINES_BY_ROUTE_TYPE,
     Ascent,
     Discipline,
@@ -47,6 +49,15 @@ class SessionForm(forms.ModelForm):
         return setting
 
 
+def grade_choices(
+    route_type: str = "", grade_system: str = ""
+) -> list[tuple[str, str]]:
+    """Grades for the chosen system, or the type's default system, else V."""
+    system = grade_system or DEFAULT_GRADE_SYSTEM.get(route_type, GradeSystem.V)  # pyright: ignore[reportArgumentType, reportCallIssue]
+    grades = GRADES_BY_SYSTEM.get(str(system), [])
+    return [("", "---------"), *((g, g) for g in grades)]
+
+
 def routes_at(session: Session, query: str = ""):
     """Routes at the Session's location, name matched ignoring case."""
     return Route.objects.filter(
@@ -66,7 +77,7 @@ class AscentForm(forms.Form):
     route_type = forms.ChoiceField(
         choices=RouteType.choices, required=False, label="Type"
     )
-    grade = forms.CharField(max_length=20, required=False)
+    grade = forms.ChoiceField(required=False)
     grade_system = forms.ChoiceField(
         choices=[("", "Default for type"), *GradeSystem.choices], required=False
     )
@@ -86,8 +97,24 @@ class AscentForm(forms.Form):
                 "hx-target": "#route-matches",
             }
         )
+        self.fields["grade"].choices = grade_choices(  # pyright: ignore[reportAttributeAccessIssue]
+            self.data.get("route_type", "") if self.is_bound else "",
+            self.data.get("grade_system", "") if self.is_bound else "",
+        )
+        for trigger in ("route_type", "grade_system"):
+            self.fields[trigger].widget.attrs.update(
+                {
+                    "hx-get": reverse("grade_options"),
+                    "hx-trigger": "change",
+                    "hx-target": "#id_grade",
+                    "hx-swap": "innerHTML",
+                    "hx-include": "#id_route_type, #id_grade_system",
+                }
+            )
         self.chosen: Route | None = route or self._route_from_data()
         if self.chosen:
+            # The chosen Route already has its grade; ignore any stale posted value.
+            self.fields["grade"] = forms.CharField(required=False)
             self.fields["route"].initial = self.chosen.pk
             allowed = DISCIPLINES_BY_ROUTE_TYPE[RouteType(self.chosen.route_type)]
             self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]
@@ -103,6 +130,7 @@ class AscentForm(forms.Form):
                     self.fields["discipline"].initial = last.discipline
                 if not self.chosen:
                     self.fields["route_type"].initial = last.route.route_type
+                    self.fields["grade"].choices = grade_choices(last.route.route_type)  # pyright: ignore[reportAttributeAccessIssue]
 
     def _route_from_data(self) -> Route | None:
         raw = self.data.get("route") if self.is_bound else None
@@ -135,11 +163,20 @@ class AscentForm(forms.Form):
                 return cleaned
             route = existing or Route(
                 name=name,
-                grade=cleaned["grade"].strip(),
+                grade=cleaned["grade"],
                 grade_system=cleaned["grade_system"],
                 route_type=cleaned["route_type"],
                 location=self.session.location,
             )
+            if existing is None:
+                try:
+                    route.clean()
+                except ValidationError as error:
+                    for field, messages in error.message_dict.items():
+                        self.add_error(
+                            field if field in self.fields else None, messages
+                        )
+                    return cleaned
         self._route = route
         self._ascent = Ascent(
             session=self.session,

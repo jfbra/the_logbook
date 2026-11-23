@@ -19,6 +19,7 @@ urlpatterns = [
     path("gyms/new/", views.gym_create, name="gym_create"),
     path("gyms/<int:pk>/edit/", views.gym_edit, name="gym_edit"),
     path("gyms/<int:pk>/delete/", views.gym_delete, name="gym_delete"),
+    path("grades/options/", views.grade_options, name="grade_options"),
     path("login/", auth_views.LoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
 ]

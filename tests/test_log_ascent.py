@@ -7,6 +7,9 @@ from .helpers import get, post
 from .test_session_detail import log_session
 
 
+SOME_GRADE = {"v": "V4", "font": "6B", "french": "6a", "ewbank": "20"}
+
+
 def add(client: Client, pk: int, **fields: str):
     data = {
         "name": "Blue V4 by the cave",
@@ -15,6 +18,10 @@ def add(client: Client, pk: int, **fields: str):
         "result": "flash",
         **fields,
     }
+    system = data.get("grade_system") or (
+        "v" if data["route_type"] == "boulder" else "ewbank"
+    )
+    data.setdefault("grade", SOME_GRADE[system])
     return post(client, f"/sessions/{pk}/ascents/new/", data)
 
 
@@ -51,6 +58,7 @@ def test_htmx_add_returns_the_updated_section_without_a_full_page(
         {
             "name": "Red",
             "route_type": "boulder",
+            "grade": "V2",
             "discipline": "boulder",
             "result": "send",
         },

@@ -4,7 +4,14 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadReque
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import AscentEditForm, AscentForm, GymForm, SessionForm, routes_at
+from .forms import (
+    AscentEditForm,
+    AscentForm,
+    GymForm,
+    SessionForm,
+    grade_choices,
+    routes_at,
+)
 from .models import Ascent, Gym, Route, Session, Setting
 from .weekly import weekly_totals
 
@@ -180,3 +187,11 @@ def gym_delete(request: HttpRequest, pk: int) -> HttpResponse:
     context = {"gym": gym, "refused": refused}
     status = 409 if refused else 200
     return render(request, "logbook/gym_confirm_delete.html", context, status=status)
+
+
+def grade_options(request: HttpRequest) -> HttpResponse:
+    """The grade <option>s for the chosen Route type and grade system."""
+    choices = grade_choices(
+        request.GET.get("route_type", ""), request.GET.get("grade_system", "")
+    )
+    return render(request, "logbook/_grade_options.html", {"choices": choices})
