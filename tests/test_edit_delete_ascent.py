@@ -1,7 +1,7 @@
 import pytest
 from django.test import Client
 
-from logbook.models import Ascent, Route, Session
+from logbook.models import IndoorAscent as Ascent, IndoorRoute as Route, Session
 
 from .helpers import get, post
 from .test_log_ascent import add
@@ -18,7 +18,7 @@ def dogged_rope(client: Client, pk: int) -> Ascent:
         client,
         pk,
         name="Rope",
-        route_type="roped",
+        route_type="sport",
         discipline="top_rope",
         result="dogged",
         rests="2",
@@ -83,7 +83,7 @@ def test_discipline_change_that_invalidates_the_result_needs_a_new_result(
         signed_in_client,
         session,
         name="Rope",
-        route_type="roped",
+        route_type="sport",
         discipline="sport",
         result="redpoint",
     )

@@ -12,7 +12,7 @@ from .forms import (
     grade_choices,
     routes_at,
 )
-from .models import Ascent, Gym, Route, Session, Setting
+from .models import Gym, IndoorAscent, IndoorRoute, Session, Setting
 from .weekly import weekly_totals
 
 
@@ -100,12 +100,13 @@ def _indoor_session_or_404(pk: int) -> Session:
 
 
 def route_search(request: HttpRequest, pk: int) -> HttpResponse:
-    """Candidate Routes at the Session's location, with grade and last result."""
+    """Candidate Routes at the named Gym, with grade, colour, set date, last result."""
     session = _indoor_session_or_404(pk)
+    gym = request.GET.get("gym", "").strip()
     query = request.GET.get("name", "").strip()
-    candidates: list[tuple[Route, Ascent | None]] = []
-    if query:
-        for route in routes_at(session, query)[:10]:
+    candidates: list[tuple[IndoorRoute, IndoorAscent | None]] = []
+    if gym and query:
+        for route in routes_at(gym, query)[:10]:
             last = route.ascents.order_by("-created_at", "-id").first()  # pyright: ignore[reportAttributeAccessIssue]
             candidates.append((route, last))
     context = {"session": session, "candidates": candidates, "query": query}
@@ -117,7 +118,7 @@ def ascent_form(request: HttpRequest, pk: int) -> HttpResponse:
     session = _indoor_session_or_404(pk)
     raw = request.GET.get("route", "")
     route = (
-        routes_at(session).filter(pk=int(raw)).first()
+        IndoorRoute.objects.select_related("gym").filter(pk=int(raw)).first()
         if raw.isascii() and raw.isdigit()
         else None
     )
@@ -126,7 +127,9 @@ def ascent_form(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 def ascent_edit(request: HttpRequest, pk: int) -> HttpResponse:
-    ascent = get_object_or_404(Ascent.objects.select_related("session", "route"), pk=pk)
+    ascent = get_object_or_404(
+        IndoorAscent.objects.select_related("session", "route"), pk=pk
+    )
     if ascent.session.indoor_outdoor != Setting.INDOOR:
         raise Http404("Ascents can only be edited on indoor Sessions.")
     form = AscentEditForm(
@@ -139,7 +142,9 @@ def ascent_edit(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 def ascent_delete(request: HttpRequest, pk: int) -> HttpResponse:
-    ascent = get_object_or_404(Ascent.objects.select_related("session", "route"), pk=pk)
+    ascent = get_object_or_404(
+        IndoorAscent.objects.select_related("session", "route"), pk=pk
+    )
     if request.method == "POST":
         ascent.delete()
         return redirect("session_detail", pk=ascent.session_id)  # pyright: ignore[reportAttributeAccessIssue]

@@ -1,7 +1,7 @@
 import pytest
 from django.test import Client
 
-from logbook.models import Ascent, Route
+from logbook.models import IndoorAscent as Ascent, IndoorRoute as Route
 
 from .helpers import get, post
 from .test_log_ascent import add

@@ -4,7 +4,7 @@ import pytest
 from django.test import Client
 
 from logbook.grades import GRADES_BY_SYSTEM
-from logbook.models import Ascent, Route
+from logbook.models import IndoorAscent as Ascent, IndoorRoute as Route
 
 from .helpers import get
 from .test_log_ascent import add
@@ -71,9 +71,9 @@ def test_creating_a_route_without_a_grade_is_rejected(
     [
         ("boulder", "", "6B"),  # a Font grade for a V boulder
         ("boulder", "", "V18"),
-        ("roped", "", "V4"),  # a V grade for an Ewbank route
-        ("roped", "", "40"),
-        ("roped", "french", "20"),
+        ("sport", "", "V4"),  # a V grade for an Ewbank route
+        ("sport", "", "40"),
+        ("sport", "french", "20"),
         ("boulder", "font", "V4"),
         ("boulder", "font", "6b"),  # case matters: Font is upper-case
         ("boulder", "", "not a grade"),
@@ -116,7 +116,7 @@ def test_a_grade_in_the_systems_list_is_accepted(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("route_type", "expected"), [("boulder", "v"), ("roped", "ewbank")]
+    ("route_type", "expected"), [("boulder", "v"), ("sport", "ewbank")]
 )
 def test_the_default_grade_system_still_follows_the_type(
     signed_in_client: Client, indoor: int, route_type: str, expected: str
@@ -138,7 +138,7 @@ def test_the_grade_choices_follow_the_chosen_system(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("route_type", "system"), [("boulder", "v"), ("roped", "ewbank")]
+    ("route_type", "system"), [("boulder", "v"), ("sport", "ewbank")]
 )
 def test_the_grade_choices_default_from_the_type(
     signed_in_client: Client, route_type: str, system: str
@@ -216,7 +216,7 @@ def test_a_stale_grade_is_ignored_when_an_existing_route_is_chosen(
         f"/sessions/{indoor}/ascents/new/",
         {
             "route": str(route.pk),
-            "route_type": "roped",
+            "route_type": "sport",
             "grade": "V4",
             "discipline": "boulder",
             "result": "repeat",

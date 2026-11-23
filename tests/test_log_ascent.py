@@ -1,7 +1,7 @@
 import pytest
 from django.test import Client
 
-from logbook.models import Ascent, Route
+from logbook.models import IndoorAscent as Ascent, IndoorRoute as Route
 
 from .helpers import get, post
 from .test_session_detail import log_session
@@ -12,6 +12,7 @@ SOME_GRADE = {"v": "V4", "font": "6B", "french": "6a", "ewbank": "20"}
 
 def add(client: Client, pk: int, **fields: str):
     data = {
+        "gym": "Depot",
         "name": "Blue V4 by the cave",
         "route_type": "boulder",
         "discipline": "boulder",
@@ -47,7 +48,7 @@ def test_adding_an_ascent_lists_it_on_the_session_page(
     assert "Blue V4 by the cave" in html
     assert "Flash" in html
     assert "No Ascents yet" not in html
-    assert Route.objects.get().location == "Depot"
+    assert Route.objects.get().gym.name == "Depot"
 
 
 def test_htmx_add_returns_the_updated_section_without_a_full_page(
@@ -60,7 +61,7 @@ def test_htmx_add_returns_the_updated_section_without_a_full_page(
             "route_type": "boulder",
             "grade": "V2",
             "discipline": "boulder",
-            "result": "send",
+            "result": "tick",
         },
         HTTP_HX_REQUEST="true",
     )
@@ -81,7 +82,7 @@ def test_route_name_is_required(signed_in_client: Client, indoor: int):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("route_type", "expected"), [("boulder", "v"), ("roped", "ewbank")]
+    ("route_type", "expected"), [("boulder", "v"), ("sport", "ewbank")]
 )
 def test_grade_system_defaults_by_route_type(
     signed_in_client: Client, indoor: int, route_type: str, expected: str
@@ -103,7 +104,7 @@ def test_chosen_grade_system_is_kept(signed_in_client: Client, indoor: int):
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("route_type", "discipline"),
-    [("boulder", "sport"), ("boulder", "top_rope"), ("roped", "boulder")],
+    [("boulder", "sport"), ("boulder", "top_rope"), ("sport", "boulder")],
 )
 def test_discipline_must_suit_the_route_type(
     signed_in_client: Client, indoor: int, route_type: str, discipline: str
@@ -125,11 +126,9 @@ def test_discipline_must_suit_the_route_type(
 @pytest.mark.parametrize(
     ("route_type", "discipline", "result"),
     [
-        ("boulder", "boulder", "redpoint"),
         ("boulder", "boulder", "dogged"),
-        ("roped", "top_rope", "redpoint"),
-        ("roped", "sport", "send"),
-        ("roped", "sport", "dab"),
+        ("sport", "top_rope", "redpoint"),
+        ("sport", "sport", "dab"),
     ],
 )
 def test_result_must_be_in_the_disciplines_list(
@@ -157,7 +156,7 @@ def test_rests_are_kept_for_dogged(signed_in_client: Client, indoor: int):
     add(
         signed_in_client,
         indoor,
-        route_type="roped",
+        route_type="sport",
         discipline="top_rope",
         result="dogged",
         rests="3",
@@ -181,7 +180,7 @@ def test_rests_must_be_a_positive_whole_number(
     response = add(
         signed_in_client,
         indoor,
-        route_type="roped",
+        route_type="sport",
         discipline="sport",
         result="dogged",
         rests=rests,
@@ -221,14 +220,14 @@ def test_discipline_defaults_to_the_last_ascent_in_the_session(
     add(
         signed_in_client,
         indoor,
-        route_type="roped",
+        route_type="sport",
         discipline="top_rope",
         result="onsight",
     )
     add(
         signed_in_client,
         indoor,
-        route_type="roped",
+        route_type="sport",
         discipline="sport",
         result="onsight",
         name="B",
@@ -246,7 +245,7 @@ def test_discipline_defaults_to_the_latest_overall_for_a_fresh_session(
     add(
         signed_in_client,
         indoor,
-        route_type="roped",
+        route_type="sport",
         discipline="sport",
         result="onsight",
     )
@@ -259,3 +258,67 @@ def test_discipline_defaults_to_the_latest_overall_for_a_fresh_session(
 
 def test_get_on_the_add_endpoint_is_not_allowed(signed_in_client: Client, indoor: int):
     assert get(signed_in_client, f"/sessions/{indoor}/ascents/new/").status_code == 405
+
+
+ALLOWED = {
+    ("boulder", "boulder"): ["onsight", "flash", "working", "attempt", "dab", "tick", "repeat"],
+    ("top_rope", "top_rope"): ["onsight", "flash", "dogged", "working", "attempt", "tick"],
+    ("sport", "sport"): ["onsight", "flash", "redpoint", "dogged", "working", "attempt", "tick"],
+    ("sport", "top_rope"): ["onsight", "flash", "dogged", "working", "attempt", "tick"],
+}  # fmt: skip
+ALL_RESULTS = [
+    "onsight", "flash", "redpoint", "dogged", "working", "attempt", "dab", "repeat", "tick",
+]  # fmt: skip
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("route_type", "discipline", "result"),
+    [(t, d, r) for (t, d), results in ALLOWED.items() for r in ALL_RESULTS],
+)
+def test_every_route_type_discipline_and_result_combination(
+    signed_in_client: Client,
+    indoor: int,
+    route_type: str,
+    discipline: str,
+    result: str,
+):
+    response = add(
+        signed_in_client,
+        indoor,
+        route_type=route_type,
+        discipline=discipline,
+        result=result,
+    )
+
+    allowed = result in ALLOWED[(route_type, discipline)]
+    assert response.status_code == (302 if allowed else 422)
+    assert Ascent.objects.count() == int(allowed)
+
+
+@pytest.mark.django_db
+def test_a_boulder_route_is_not_offered_a_rope_result_or_discipline(
+    signed_in_client: Client, indoor: int
+):
+    response = add(signed_in_client, indoor, discipline="top_rope", result="onsight")
+
+    assert response.status_code == 422
+
+
+@pytest.mark.django_db
+def test_a_route_needs_only_a_name_type_and_grade(
+    signed_in_client: Client, indoor: int
+):
+    route_data = {
+        "gym": "Depot",
+        "name": "Bare",
+        "route_type": "top_rope",
+        "grade": "18",
+        "discipline": "top_rope",
+        "result": "tick",
+    }
+
+    response = post(signed_in_client, f"/sessions/{indoor}/ascents/new/", route_data)
+
+    assert response.status_code == 302
+    assert Route.objects.get().route_type == "top_rope"
