@@ -182,6 +182,34 @@ class IndoorRoute(Route):
     gym = models.ForeignKey(Gym, on_delete=models.PROTECT, related_name="routes")
     hold_colour = models.CharField(max_length=50, blank=True)
     date_set = models.DateField(null=True, blank=True)
+    stars = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(3)],
+    )
+    length_m = models.PositiveIntegerField(null=True, blank=True)
+    description = models.TextField(blank=True)
+    setter = models.CharField(max_length=100, blank=True)
+    style = models.CharField(max_length=50, blank=True)
+    rope_number = models.PositiveSmallIntegerField(null=True, blank=True)
+    bolts = models.PositiveSmallIntegerField(null=True, blank=True)
+    area = models.CharField(max_length=100, blank=True)
+
+    def clean(self) -> None:
+        errors: dict[str, str | list[str]] = {}
+        try:
+            super().clean()
+        except ValidationError as error:
+            errors.update(error.message_dict)
+        kind = RouteType(self.route_type) if self.route_type else None
+        if self.rope_number is not None and kind == RouteType.BOULDER:
+            errors["rope_number"] = "A boulder has no rope number."
+        if self.bolts is not None and kind != RouteType.SPORT:
+            errors["bolts"] = "Bolts only apply to sport Routes."
+        if self.area and kind != RouteType.BOULDER:
+            errors["area"] = "Area only applies to boulders."
+        if errors:
+            raise ValidationError(errors)
 
 
 class Ascent(models.Model):

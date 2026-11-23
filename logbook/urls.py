@@ -15,6 +15,7 @@ urlpatterns = [
     path("ascents/<int:pk>/delete/", views.ascent_delete, name="ascent_delete"),
     path("sessions/<int:pk>/edit/", views.session_edit, name="session_edit"),
     path("sessions/<int:pk>/delete/", views.session_delete, name="session_delete"),
+    path("routes/<int:pk>/edit/", views.route_edit, name="route_edit"),
     path("gyms/", views.gym_list, name="gym_list"),
     path("gyms/new/", views.gym_create, name="gym_create"),
     path("gyms/<int:pk>/edit/", views.gym_edit, name="gym_edit"),

@@ -1,0 +1,13 @@
+{% extends "logbook/base.html" %}
+{% block title %}Edit Route - The Logbook{% endblock %}
+{% block content %}
+  <h1>Edit Route</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions">
+      <button class="primary" type="submit">Save</button>
+      <a class="button" href="{% url 'gym_list' %}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

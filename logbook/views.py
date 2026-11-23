@@ -8,6 +8,7 @@ from .forms import (
     AscentEditForm,
     AscentForm,
     GymForm,
+    RouteEditForm,
     SessionForm,
     grade_choices,
     result_choices,
@@ -146,6 +147,15 @@ def ascent_delete(request: HttpRequest, pk: int) -> HttpResponse:
         ascent.delete()
         return redirect("session_detail", pk=ascent.session_id)  # pyright: ignore[reportAttributeAccessIssue]
     return render(request, "logbook/ascent_confirm_delete.html", {"ascent": ascent})
+
+
+def route_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    route = get_object_or_404(IndoorRoute.objects.select_related("gym"), pk=pk)
+    form = RouteEditForm(request.POST or None, instance=route)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        return redirect("gym_list")
+    return render(request, "logbook/route_form.html", {"form": form, "route": route})
 
 
 def gym_list(request: HttpRequest) -> HttpResponse:
