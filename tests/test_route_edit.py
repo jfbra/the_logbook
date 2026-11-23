@@ -58,7 +58,7 @@ def test_every_attribute_can_be_set_and_edited(signed_in_client: Client, gym: Gy
             style="technical",
             hold_colour="Red",
             date_set="2026-11-01",
-            rope_number="4",
+            rope_number="R4",
             bolts="8",
         ),
     )
@@ -68,7 +68,7 @@ def test_every_attribute_can_be_set_and_edited(signed_in_client: Client, gym: Gy
     assert (route.stars, route.length_m, route.description) == (3, 12, "Crimpy")
     assert (route.setter, route.style, route.hold_colour) == ("Sam", "technical", "Red")
     assert route.date_set == datetime.date(2026, 11, 1)
-    assert (route.rope_number, route.bolts, route.area) == (4, 8, "")
+    assert (route.rope_number, route.bolts, route.area) == ("R4", 8, "")
 
 
 def test_boulder_area_can_be_set(signed_in_client: Client, gym: Gym):
@@ -113,7 +113,7 @@ def test_fields_that_do_not_apply_to_the_type_are_rejected(
 
     assert response.status_code == 200
     route.refresh_from_db()
-    assert (route.bolts, route.rope_number, route.area) == (None, None, "")
+    assert (route.bolts, route.rope_number, route.area) == (None, "", "")
 
 
 def test_route_can_be_moved_to_another_gym(signed_in_client: Client, gym: Gym):
@@ -193,3 +193,16 @@ def test_session_ascent_list_links_to_the_route_edit_page(
     html = get(signed_in_client, f"/sessions/{session.pk}/").content.decode()
 
     assert url(route) in html
+
+
+@pytest.mark.parametrize("field", ["length_m", "bolts"])
+def test_length_and_bolts_must_be_positive(
+    signed_in_client: Client, gym: Gym, field: str
+):
+    route = make_route(gym, route_type="sport", grade="20")
+
+    response = post(signed_in_client, url(route), form_data(route, **{field: "0"}))
+
+    assert response.status_code == 200
+    route.refresh_from_db()
+    assert getattr(route, field) is None
