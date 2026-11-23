@@ -1,0 +1,14 @@
+{% extends "logbook/base.html" %}
+{% block title %}Delete Gym - The Logbook{% endblock %}
+{% block content %}
+  <h1>Delete this Gym?</h1>
+  <p>{{ gym.name }}</p>
+  {% if refused %}<p class="error">This Gym cannot be deleted because it has Routes.</p>{% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="actions">
+      <button class="primary" type="submit">Delete</button>
+      <a class="button" href="{% url 'gym_list' %}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

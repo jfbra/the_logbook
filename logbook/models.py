@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower
 
 from .grades import GRADES_BY_SYSTEM
 
@@ -168,3 +169,21 @@ class Ascent(models.Model):
             errors["rests"] = "Rests must be a positive whole number."
         if errors:
             raise ValidationError(errors)
+
+
+class Gym(models.Model):
+    """A climbing gym. Created by name alone; the rest is filled in later."""
+
+    name = models.CharField(max_length=200)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    website = models.URLField(blank=True)
+
+    class Meta:
+        ordering = [Lower("name"), "id"]
+        constraints = [
+            models.UniqueConstraint(Lower("name"), name="gym_name_unique_ignoring_case")
+        ]
+
+    def __str__(self) -> str:
+        return self.name

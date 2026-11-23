@@ -1,0 +1,27 @@
+{% extends "logbook/base.html" %}
+{% block title %}Gyms - The Logbook{% endblock %}
+{% block content %}
+  <h1>Gyms</h1>
+  <div class="actions">
+    <a class="button primary" href="{% url 'gym_create' %}">Add a Gym</a>
+    <a class="button" href="{% url 'session_list' %}">Sessions</a>
+  </div>
+  {% if gyms %}
+    <table>
+      <thead><tr><th>Name</th><th>City</th><th>Country</th><th>Website</th><th></th></tr></thead>
+      <tbody>
+      {% for gym in gyms %}
+        <tr>
+          <td data-label="Name">{{ gym.name }}</td>
+          <td data-label="City">{{ gym.city }}</td>
+          <td data-label="Country">{{ gym.country }}</td>
+          <td data-label="Website">{% if gym.website %}<a href="{{ gym.website }}">{{ gym.website }}</a>{% endif %}</td>
+          <td><a class="button" href="{% url 'gym_edit' gym.pk %}">Edit</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No Gyms yet.</p>
+  {% endif %}
+{% endblock %}
