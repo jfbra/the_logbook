@@ -78,14 +78,19 @@ def narrow_results(form: forms.BaseForm, discipline: str) -> None:
     choices = dict(form.fields["discipline"].choices)  # pyright: ignore[reportAttributeAccessIssue]
     if discipline not in choices:
         discipline = next(iter(choices), "")
-    form.fields["result"].widget.choices = result_choices(discipline)  # pyright: ignore[reportAttributeAccessIssue]
+    shown = result_choices(discipline)
+    current = form.initial.get("result") if not form.is_bound else None
+    if current and current not in dict(shown):
+        # Never silently replace a stored value that no longer fits.
+        shown.append((current, str(dict(Result.choices).get(current, current))))
+    form.fields["result"].widget.choices = shown  # pyright: ignore[reportAttributeAccessIssue]
     form.fields["discipline"].widget.attrs.update(
         {
             "hx-get": reverse("result_options"),
             "hx-trigger": "change",
             "hx-target": "#id_result",
             "hx-swap": "innerHTML",
-            "hx-include": "#id_discipline",
+            "hx-include": "#id_discipline, #id_result",
         }
     )
 

@@ -98,3 +98,30 @@ def test_edit_page_offers_results_for_the_ascents_discipline(
     assert option_values(html, "result") == RESULTS_BY_DISCIPLINE["top_rope"]
     tag = re.search(r'<select[^>]*name="discipline"[^>]*>', html).group(0)  # pyright: ignore[reportOptionalMemberAccess]
     assert 'hx-get="/results/options/"' in tag
+
+
+@pytest.mark.django_db
+def test_edit_page_keeps_a_stored_result_that_no_longer_fits(
+    signed_in_client: Client, indoor: int
+):
+    from logbook.models import IndoorAscent
+
+    add(signed_in_client, indoor, discipline="boulder", result="flash")
+    ascent = IndoorAscent.objects.get()
+    IndoorAscent.objects.filter(pk=ascent.pk).update(result="redpoint")
+
+    html = get(signed_in_client, f"/ascents/{ascent.pk}/edit/").content.decode()
+
+    assert "redpoint" in option_values(html, "result")
+    assert re.search(r'<option value="redpoint" selected', html)
+
+
+@pytest.mark.django_db
+def test_result_options_marks_the_current_result_when_still_valid(
+    signed_in_client: Client,
+):
+    html = get(
+        signed_in_client, "/results/options/?discipline=sport&result=dogged"
+    ).content.decode()
+
+    assert '<option value="dogged" selected>' in html
