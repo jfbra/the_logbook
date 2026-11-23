@@ -2,6 +2,7 @@ import pytest
 from django.db.models import ProtectedError
 from django.test import Client
 
+from logbook.forms import GymForm
 from logbook.models import Gym
 
 from .helpers import get, post
@@ -142,3 +143,17 @@ def test_deleting_a_gym_that_has_routes_is_refused(
     assert response.status_code == 409
     assert "has Routes" in response.content.decode()
     assert Gym.objects.filter(pk=gym.pk).exists()
+
+
+@pytest.mark.django_db
+def test_a_duplicate_that_slips_past_validation_is_rejected_not_a_server_error(
+    signed_in_client: Client, monkeypatch: pytest.MonkeyPatch
+):
+    # The database constraint backs up the form's own check (Django validates it too).
+    Gym.objects.create(name="Depot")
+    monkeypatch.setattr(GymForm, "clean_name", lambda self: self.cleaned_data["name"])
+
+    response = post(signed_in_client, "/gyms/new/", {"name": "depot"})
+
+    assert response.status_code == 200
+    assert Gym.objects.count() == 1

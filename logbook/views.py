@@ -1,3 +1,4 @@
+from django.db import IntegrityError
 from django.db.models import Count, ProtectedError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_POST
@@ -147,8 +148,13 @@ def _gym_form_view(
 ) -> HttpResponse:
     form = GymForm(request.POST or None, instance=gym)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        return redirect("gym_list")
+        try:
+            form.save()
+        except IntegrityError:
+            # A concurrent request took the name between validation and save.
+            form.add_error("name", "A Gym with that name already exists.")
+        else:
+            return redirect("gym_list")
     context = {"form": form, "title": title, "gym": gym}
     return render(request, "logbook/gym_form.html", context)
 
