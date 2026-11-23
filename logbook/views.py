@@ -8,6 +8,7 @@ from .forms import (
     AscentEditForm,
     AscentForm,
     GymForm,
+    result_choices,
     SessionForm,
     grade_choices,
     route_by_id,
@@ -195,4 +196,10 @@ def grade_options(request: HttpRequest) -> HttpResponse:
     choices = grade_choices(
         request.GET.get("route_type", ""), request.GET.get("grade_system", "")
     )
+    return render(request, "logbook/_grade_options.html", {"choices": choices})
+
+
+def result_options(request: HttpRequest) -> HttpResponse:
+    """The result <option>s for the chosen Discipline."""
+    choices = result_choices(request.GET.get("discipline", ""))
     return render(request, "logbook/_grade_options.html", {"choices": choices})
