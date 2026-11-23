@@ -112,6 +112,8 @@ class AscentForm(forms.Form):
             )
         self.chosen: Route | None = route or self._route_from_data()
         if self.chosen:
+            # The chosen Route already has its grade; ignore any stale posted value.
+            self.fields["grade"] = forms.CharField(required=False)
             self.fields["route"].initial = self.chosen.pk
             allowed = DISCIPLINES_BY_ROUTE_TYPE[RouteType(self.chosen.route_type)]
             self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]

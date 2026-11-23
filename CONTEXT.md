@@ -25,7 +25,7 @@ An outdoor climbing area that holds Outdoor Routes. Has a name, location and cou
 _Avoid_: Location
 
 **Route**:
-A specific climb or boulder problem that can be attempted again over time. Either an Indoor Route or an Outdoor Route. Has a name, a grade and a Route type. A Route is a single pitch; multi-pitch is not yet modelled. An Ascent is always an attempt-or-completion of one Route.
+A specific climb or boulder problem that can be attempted again over time. Either an Indoor Route or an Outdoor Route. Has a name, a grade and a Route type. The grade is mandatory and is one of the ordered, code-defined values of the Route's grade system (V, Font, French or Ewbank); the system defaults from the Route type (V for boulder, Ewbank for roped). A Route is a single pitch; multi-pitch is not yet modelled. An Ascent is always an attempt-or-completion of one Route.
 _Avoid_: Problem, climb, line
 
 **Indoor Route**:

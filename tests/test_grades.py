@@ -203,3 +203,25 @@ def test_logging_an_ascent_of_an_existing_route_needs_no_grade(
 
     assert response.status_code == 302
     assert Ascent.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_a_stale_grade_is_ignored_when_an_existing_route_is_chosen(
+    signed_in_client: Client, indoor: int
+):
+    add(signed_in_client, indoor, name="Blue Cave")
+    route = Route.objects.get()
+
+    response = signed_in_client.post(
+        f"/sessions/{indoor}/ascents/new/",
+        {
+            "route": str(route.pk),
+            "route_type": "roped",
+            "grade": "V4",
+            "discipline": "boulder",
+            "result": "repeat",
+        },
+    )
+
+    assert response.status_code == 302
+    assert Route.objects.get().grade == "V4"
