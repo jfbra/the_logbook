@@ -31,6 +31,10 @@ class Session(models.Model):
     )
     notes = models.TextField(blank=True)
 
+    # Set by the form when a date was rejected: the instance then still holds the
+    # old value, which must not be compared with the new one.
+    skip_date_checks = False
+
     class Meta:
         ordering = ["-date", "-id"]
 
@@ -53,8 +57,8 @@ class Session(models.Model):
         return sorted(gyms, key=lambda gym: gym.name.lower())
 
     def clean(self) -> None:
-        if self.date is None:
-            return  # The field's own "required" error covers this.
+        if self.skip_date_checks or self.date is None:
+            return  # The field's own error covers this.
         if self.end_date and self.end_date < self.date:
             raise ValidationError(
                 {"end_date": "The end date cannot be before the start date."}
@@ -66,7 +70,9 @@ class Session(models.Model):
             if outside:
                 raise ValidationError(
                     f"{outside} Ascent{'s' if outside != 1 else ''} would fall "
-                    "outside these dates. Change or delete them first."
+                    "outside these dates. To move Ascents, first widen the dates "
+                    "to cover both the old and new days, change each Ascent's date, "
+                    "then narrow them. Otherwise delete those Ascents."
                 )
 
 

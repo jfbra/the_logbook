@@ -18,7 +18,7 @@
     {% if form.chosen %}
       {{ form.route }}
       <p><strong>{{ form.chosen.name }}</strong>{% if form.chosen.grade %} ({{ form.chosen.grade }}){% endif %} &middot; {{ form.chosen.gym.name }} &middot; {{ form.chosen.get_route_type_display }}
-        <a class="button" href="{% url 'ascent_form' session.pk %}" hx-get="{% url 'ascent_form' session.pk %}" hx-target="#ascents" hx-swap="outerHTML">Change route</a></p>
+        <a class="button" href="{% url 'ascent_form' session.pk %}" hx-get="{% url 'ascent_form' session.pk %}" hx-include="#id_date" hx-target="#ascents" hx-swap="outerHTML">Change route</a></p>
       {{ form.date.as_field_group }}
       {{ form.discipline.as_field_group }}
       {{ form.result.as_field_group }}

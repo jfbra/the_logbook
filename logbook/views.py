@@ -85,6 +85,7 @@ def session_delete(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         session.delete()
         return redirect("session_list")
+    prefetch_related_objects([session], "ascents__route__gym")
     context = {"session": session, "ascent_count": session.ascents.count()}  # pyright: ignore[reportAttributeAccessIssue]
     return render(request, "logbook/session_confirm_delete.html", context)
 
@@ -107,7 +108,8 @@ def ascent_form(request: HttpRequest, pk: int) -> HttpResponse:
     """The quick-add section with an existing Route chosen (or cleared)."""
     session = get_object_or_404(Session, pk=pk)
     route = route_by_id(request.GET.get("route"))
-    form = AscentForm(session=session, route=route)
+    date = request.GET.get("date", "")
+    form = AscentForm(session=session, route=route, date=date)
     return render(request, "logbook/_ascents.html", _ascent_context(session, form))
 
 

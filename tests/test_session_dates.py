@@ -247,3 +247,73 @@ def test_a_search_match_shows_the_result_of_the_latest_dated_ascent(
     ).content.decode()
 
     assert "last: Dab" in html
+
+
+def test_the_orphan_error_explains_how_to_move_ascents(signed_in_client: Client):
+    pk = log_session(signed_in_client)
+    add(signed_in_client, pk)
+
+    response = edit_session(signed_in_client, pk, "2026-11-21")
+
+    assert "first widen the dates" in response.content.decode()
+
+
+@pytest.mark.parametrize(
+    ("date", "end_date"),
+    [("", "2026-11-19"), ("2026-11-23", "not a date")],
+)
+def test_a_bad_date_field_raises_no_second_error_from_the_old_value(
+    signed_in_client: Client, trip: int, date: str, end_date: str
+):
+    add(signed_in_client, trip, date="2026-11-21")
+
+    html = edit_session(signed_in_client, trip, date, end_date).content.decode()
+
+    assert "errorlist" in html
+    assert "cannot be before the start date" not in html
+    assert "would fall outside" not in html
+
+
+def test_choosing_a_route_keeps_the_typed_date(signed_in_client: Client, trip: int):
+    add(signed_in_client, trip)
+    route = Route.objects.get()
+    form = f"/sessions/{trip}/ascents/form/"
+
+    chosen = get(signed_in_client, f"{form}?route={route.pk}&date=2026-11-22")
+    cleared = get(signed_in_client, f"{form}?date=2026-11-22")
+
+    for response in [chosen, cleared]:
+        html = response.content.decode()
+        assert 'name="date" value="2026-11-22"' in html
+    # Only a chosen Route has the "Change route" link.
+    assert 'hx-include="#id_date"' in chosen.content.decode()
+
+
+def test_the_route_matches_send_the_typed_date(signed_in_client: Client, trip: int):
+    add(signed_in_client, trip, name="Cave")
+
+    html = get(
+        signed_in_client, f"/sessions/{trip}/routes/search/?gym=Depot&name=Cave"
+    ).content.decode()
+
+    assert 'hx-include="#id_date"' in html
+
+
+@pytest.mark.parametrize("bad", ["", "nonsense", "2026-02-30"])
+def test_an_unusable_typed_date_falls_back_to_the_start(
+    signed_in_client: Client, trip: int, bad: str
+):
+    response = get(signed_in_client, f"/sessions/{trip}/ascents/form/?date={bad}")
+
+    assert 'name="date" value="2026-11-20"' in response.content.decode()
+
+
+def test_the_ascent_delete_confirmation_shows_the_date(
+    signed_in_client: Client, trip: int
+):
+    add(signed_in_client, trip, date="2026-11-21")
+    ascent = Ascent.objects.get()
+
+    html = get(signed_in_client, f"/ascents/{ascent.pk}/delete/").content.decode()
+
+    assert "2026-11-21" in html

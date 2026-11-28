@@ -2,7 +2,7 @@
 {% block title %}Delete Ascent - The Logbook{% endblock %}
 {% block content %}
   <h1>Delete this Ascent?</h1>
-  <p>{{ ascent.route.name }} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}</p>
+  <p>{{ ascent.date|date:"Y-m-d" }} &middot; {{ ascent.route.name }} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}</p>
   <form method="post">
     {% csrf_token %}
     <div class="actions">
