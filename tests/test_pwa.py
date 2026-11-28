@@ -38,7 +38,7 @@ def test_every_page_is_phone_ready_and_links_the_manifest(signed_in_client: Clie
     post(
         signed_in_client,
         "/sessions/new/",
-        {"date": "2026-11-20", "activity_type": "climbing"},
+        {"date": "2026-11-20"},
     )
     pk = session_ids(signed_in_client)[0]
     pages = [get(Client(), "/login/")]

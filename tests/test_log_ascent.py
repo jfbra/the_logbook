@@ -28,7 +28,7 @@ def add(client: Client, pk: int, **fields: str):
 
 @pytest.fixture
 def indoor(signed_in_client: Client) -> int:
-    return log_session(signed_in_client, indoor_outdoor="indoor", location="Depot")
+    return log_session(signed_in_client)
 
 
 def test_anonymous_user_cannot_add_an_ascent():
@@ -200,20 +200,6 @@ def test_records_have_timestamps(signed_in_client: Client, indoor: int):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("setting", ["outdoor", ""])
-def test_adding_to_an_outdoor_or_unset_session_is_rejected(
-    signed_in_client: Client, setting: str
-):
-    pk = log_session(signed_in_client, indoor_outdoor=setting)
-
-    response = add(signed_in_client, pk)
-
-    assert response.status_code == 400
-    assert Ascent.objects.count() == 0
-    assert Route.objects.count() == 0
-
-
-@pytest.mark.django_db
 def test_discipline_defaults_to_the_last_ascent_in_the_session(
     signed_in_client: Client, indoor: int
 ):
@@ -249,7 +235,7 @@ def test_discipline_defaults_to_the_latest_overall_for_a_fresh_session(
         discipline="sport",
         result="onsight",
     )
-    other = log_session(signed_in_client, indoor_outdoor="indoor")
+    other = log_session(signed_in_client)
 
     html = get(signed_in_client, f"/sessions/{other}/").content.decode()
 

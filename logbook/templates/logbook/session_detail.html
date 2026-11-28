@@ -1,14 +1,12 @@
 {% extends "logbook/base.html" %}
 {% block title %}Session - The Logbook{% endblock %}
 {% block content %}
-  <h1>{{ session.date|date:"Y-m-d" }} {{ session.get_activity_type_display }}</h1>
+  <h1>Session {{ session }}</h1>
   <dl>
-    <dt>Date</dt><dd>{{ session.date|date:"Y-m-d" }}</dd>
-    <dt>Type</dt><dd>{{ session.get_activity_type_display }}</dd>
+    <dt>Start date</dt><dd>{{ session.date|date:"Y-m-d" }}</dd>
+    <dt>End date</dt><dd>{{ session.end_date|date:"Y-m-d" }}</dd>
     <dt>Duration (min)</dt><dd>{{ session.duration_minutes|default_if_none:"" }}</dd>
     <dt>Effort</dt><dd>{{ session.effort|default_if_none:"" }}</dd>
-    <dt>Location</dt><dd>{{ session.location }}</dd>
-    <dt>Setting</dt><dd>{{ session.get_indoor_outdoor_display }}</dd>
     <dt>Notes</dt><dd>{{ session.notes|linebreaksbr }}</dd>
   </dl>
   <div class="actions">

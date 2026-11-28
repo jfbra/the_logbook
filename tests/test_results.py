@@ -10,7 +10,7 @@ from .test_session_detail import log_session
 
 @pytest.fixture
 def indoor(signed_in_client: Client) -> int:
-    return log_session(signed_in_client, indoor_outdoor="indoor", location="Depot")
+    return log_session(signed_in_client)
 
 
 def option_values(html: str, select_name: str | None = None) -> list[str]:
