@@ -181,11 +181,7 @@ def test_session_ascent_list_links_to_the_route_edit_page(
     signed_in_client: Client, gym: Gym
 ):
     route = make_route(gym)
-    session = Session.objects.create(
-        date=datetime.date(2026, 11, 1),
-        activity_type="climbing",
-        indoor_outdoor="indoor",
-    )
+    session = Session.objects.create(date=datetime.date(2026, 11, 1))
     IndoorAscent.objects.create(
         session=session, route=route, discipline="boulder", result="flash"
     )

@@ -1,3 +1,5 @@
+import datetime
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -21,34 +23,32 @@ from .models import (
 )
 
 
+def date_input(**attrs: str) -> forms.DateInput:
+    return forms.DateInput(attrs={"type": "date", **attrs}, format="%Y-%m-%d")
+
+
+def parse_day(raw: str) -> datetime.date | None:
+    """The ISO date in `raw`, or None for a missing or malformed one."""
+    try:
+        return datetime.date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
 class SessionForm(forms.ModelForm):
     class Meta:
         model = Session
-        fields = [
-            "date",
-            "activity_type",
-            "duration_minutes",
-            "effort",
-            "location",
-            "indoor_outdoor",
-            "notes",
-        ]
-        widgets = {"date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
+        fields = ["date", "end_date", "duration_minutes", "effort", "notes"]
+        widgets = {"date": date_input(), "end_date": date_input()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["date"].initial = timezone.localdate
-        self.fields["activity_type"].initial = "climbing"
 
-    def clean_indoor_outdoor(self) -> str:
-        setting = self.cleaned_data["indoor_outdoor"]
-        count = self.instance.ascents.count() if self.instance.pk else 0  # pyright: ignore[reportAttributeAccessIssue]
-        if count and setting != self.instance.indoor_outdoor:
-            raise ValidationError(
-                f"The setting cannot be changed because this Session has {count} "
-                f"Ascent{'s' if count != 1 else ''}. Delete them first."
-            )
-        return setting
+    def clean(self):
+        cleaned = super().clean()
+        self.instance.skip_date_checks = bool({"date", "end_date"} & set(self.errors))
+        return cleaned
 
 
 def grade_choices(
@@ -130,16 +130,27 @@ class AscentForm(forms.Form):
     grade_system = forms.ChoiceField(
         choices=[("", "Default for type"), *GradeSystem.choices], required=False
     )
+    date = forms.DateField(required=False)
     discipline = forms.ChoiceField(choices=Discipline.choices)
     result = forms.ChoiceField(choices=Result.choices)
     rests = forms.IntegerField(min_value=1, required=False)
     notes = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False)
 
     def __init__(
-        self, *args, session: Session, route: IndoorRoute | None = None, **kwargs
+        self,
+        *args,
+        session: Session,
+        route: IndoorRoute | None = None,
+        date: str = "",
+        **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.session = session
+        self.fields["date"].widget = date_input(
+            min=session.date.isoformat(), max=session.last_date.isoformat()
+        )
+        # A date typed before the Route was chosen (or changed) is kept.
+        self.fields["date"].initial = parse_day(date) or session.date
         search = {
             "autocomplete": "off",
             "hx-get": reverse("route_search", args=[session.pk]),
@@ -171,10 +182,8 @@ class AscentForm(forms.Form):
             allowed = DISCIPLINES_BY_ROUTE_TYPE[RouteType(self.chosen.route_type)]
             self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]
         if not self.is_bound:
-            last = (
-                IndoorAscent.objects.filter(session=session).last()
-                or IndoorAscent.objects.order_by("created_at", "id").last()
-            )
+            entered = IndoorAscent.objects.order_by("created_at", "id")
+            last = entered.filter(session=session).last() or entered.last()
             if last:
                 if not self.chosen or last.discipline in dict(
                     self.fields["discipline"].choices  # pyright: ignore[reportAttributeAccessIssue]
@@ -230,6 +239,7 @@ class AscentForm(forms.Form):
         self._ascent = IndoorAscent(
             session=self.session,
             route=route,
+            date=cleaned["date"],
             discipline=cleaned["discipline"],
             result=cleaned["result"],
             rests=cleaned["rests"],
@@ -258,13 +268,22 @@ class AscentEditForm(forms.ModelForm):
 
     class Meta:
         model = IndoorAscent
-        fields = ["discipline", "result", "rests", "notes"]
-        widgets = {"notes": forms.Textarea(attrs={"rows": 2})}
+        fields = ["date", "discipline", "result", "rests", "notes"]
+        widgets = {
+            "date": date_input(),
+            "notes": forms.Textarea(attrs={"rows": 2}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         allowed = DISCIPLINES_BY_ROUTE_TYPE[RouteType(self.instance.route.route_type)]
         self.fields["discipline"].choices = [(d.value, d.label) for d in allowed]  # pyright: ignore[reportAttributeAccessIssue]
+        # Blank would silently reset the date to the Session's start.
+        self.fields["date"].required = True
+        self.fields["date"].widget.attrs.update(
+            min=self.instance.session.date.isoformat(),
+            max=self.instance.session.last_date.isoformat(),
+        )
         self.fields["rests"].widget.attrs["min"] = 1
         narrow_results(
             self,
@@ -300,7 +319,7 @@ class RouteEditForm(forms.ModelForm):
             "area",
         ]
         widgets = {
-            "date_set": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "date_set": date_input(),
             "description": forms.Textarea(attrs={"rows": 3}),
         }
 

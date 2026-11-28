@@ -1,3 +1,5 @@
+import datetime
+
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import IntegrityError, models, transaction
@@ -7,36 +9,71 @@ from .grades import GRADES_BY_SYSTEM
 
 
 class ActivityType(models.TextChoices):
-    """Fixed, code-defined list. Only climbing is enabled for now."""
+    """Fixed, code-defined list. No field uses it until Activities are recorded."""
 
     CLIMBING = "climbing", "Climbing"
-
-
-class Setting(models.TextChoices):
-    INDOOR = "indoor", "Indoor"
-    OUTDOOR = "outdoor", "Outdoor"
+    HIKING = "hiking", "Hiking"
+    MOUNTAINEERING = "mountaineering", "Mountaineering"
+    RUNNING = "running", "Running"
+    WALKING = "walking", "Walking"
 
 
 class Session(models.Model):
-    """One bout of training on a given day. Ascents will attach to it later."""
+    """One bout of training over one or more days, made of what is recorded on it."""
 
-    date = models.DateField()
-    activity_type = models.CharField(max_length=20, choices=ActivityType)
+    date = models.DateField("start date")
+    end_date = models.DateField(null=True, blank=True)
     duration_minutes = models.PositiveIntegerField(null=True, blank=True)
     effort = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(10)],
     )
-    location = models.CharField(max_length=200, blank=True)
-    indoor_outdoor = models.CharField(max_length=10, choices=Setting, blank=True)
     notes = models.TextField(blank=True)
+
+    # Set by the form when a date was rejected: the instance then still holds the
+    # old value, which must not be compared with the new one.
+    skip_date_checks = False
 
     class Meta:
         ordering = ["-date", "-id"]
 
     def __str__(self) -> str:
-        return f"{self.date} {self.get_activity_type_display()}"  # pyright: ignore[reportAttributeAccessIssue]
+        if self.end_date and self.end_date != self.date:
+            return f"{self.date} to {self.end_date}"
+        return str(self.date)
+
+    @property
+    def last_date(self) -> datetime.date:
+        return self.end_date or self.date
+
+    @property
+    def gyms(self) -> list["Gym"]:
+        """The distinct Gyms of this Session's Ascents, by name.
+
+        Prefetch `ascents__route__gym` before reading this for many Sessions.
+        """
+        gyms = {a.route.gym for a in self.ascents.all()}  # pyright: ignore[reportAttributeAccessIssue]
+        return sorted(gyms, key=lambda gym: gym.name.lower())
+
+    def clean(self) -> None:
+        if self.skip_date_checks or self.date is None:
+            return  # The field's own error covers this.
+        if self.end_date and self.end_date < self.date:
+            raise ValidationError(
+                {"end_date": "The end date cannot be before the start date."}
+            )
+        if self.pk:
+            outside = self.ascents.exclude(  # pyright: ignore[reportAttributeAccessIssue]
+                date__range=(self.date, self.last_date)
+            ).count()
+            if outside:
+                raise ValidationError(
+                    f"{outside} Ascent{'s' if outside != 1 else ''} would fall "
+                    "outside these dates. To move Ascents, first widen the dates "
+                    "to cover both the old and new days, change each Ascent's date, "
+                    "then narrow them. Otherwise delete those Ascents."
+                )
 
 
 class GymManager(models.Manager["Gym"]):
@@ -222,6 +259,8 @@ class Ascent(models.Model):
     Concrete subclasses add `session` and `route`.
     """
 
+    # Blank means "the Session's start date": see `clean_date`.
+    date = models.DateField(blank=True)
     discipline = models.CharField(max_length=10, choices=Discipline)
     result = models.CharField(max_length=10, choices=Result)
     rests = models.PositiveIntegerField(null=True, blank=True)
@@ -231,7 +270,15 @@ class Ascent(models.Model):
 
     class Meta:
         abstract = True
-        ordering = ["created_at", "id"]
+        ordering = ["date", "created_at", "id"]
+
+    def clean_date(self, session: Session) -> dict[str, str]:
+        """Default the date to the Session's start; it must lie within its dates."""
+        if self.date is None:
+            self.date = session.date
+        if not session.date <= self.date <= session.last_date:
+            return {"date": f"The date must be within the Session ({session})."}
+        return {}
 
     def clean_discipline_result_rests(self, route: Route) -> dict[str, str]:
         errors: dict[str, str] = {}
@@ -264,10 +311,13 @@ class IndoorAscent(Ascent):
     class Meta(Ascent.Meta):
         abstract = False
 
+    def save(self, *args, **kwargs):
+        if self.date is None:
+            self.date = self.session.date
+        super().save(*args, **kwargs)
+
     def clean(self) -> None:
-        errors: dict[str, str] = {}
-        if self.session.indoor_outdoor != Setting.INDOOR:
-            errors["session"] = "Ascents can only be added to indoor Sessions."
+        errors = self.clean_date(self.session)
         errors.update(self.clean_discipline_result_rests(self.route))
         if errors:
             raise ValidationError(errors)

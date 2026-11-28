@@ -12,7 +12,7 @@ def this_monday() -> datetime.date:
 
 
 def log_on(client: Client, day: datetime.date, **fields: str) -> None:
-    data = {"date": day.isoformat(), "activity_type": "climbing", **fields}
+    data = {"date": day.isoformat(), **fields}
     assert post(client, "/sessions/new/", data).status_code == 302
 
 
@@ -59,7 +59,6 @@ def test_totals_reflect_edits_and_deletes(signed_in_client: Client):
         f"/sessions/{pk}/edit/",
         {
             "date": this_monday().isoformat(),
-            "activity_type": "climbing",
             "duration_minutes": "75",
         },
     )
@@ -81,7 +80,6 @@ def test_editing_a_sessions_date_moves_its_minutes_between_weeks(
         f"/sessions/{pk}/edit/",
         {
             "date": (this_monday() - day).isoformat(),
-            "activity_type": "climbing",
             "duration_minutes": "40",
         },
     )

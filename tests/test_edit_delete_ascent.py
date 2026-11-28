@@ -1,7 +1,7 @@
 import pytest
 from django.test import Client
 
-from logbook.models import IndoorAscent as Ascent, IndoorRoute as Route, Session
+from logbook.models import IndoorAscent as Ascent, IndoorRoute as Route
 
 from .helpers import get, post
 from .test_log_ascent import add
@@ -10,7 +10,7 @@ from .test_session_detail import log_session
 
 @pytest.fixture
 def session(signed_in_client: Client) -> int:
-    return log_session(signed_in_client, indoor_outdoor="indoor", location="Depot")
+    return log_session(signed_in_client)
 
 
 def dogged_rope(client: Client, pk: int) -> Ascent:
@@ -54,7 +54,13 @@ def test_edit_changes_discipline_rests_and_notes(
     response = post(
         signed_in_client,
         f"/ascents/{ascent.pk}/edit/",
-        {"discipline": "sport", "result": "dogged", "rests": "4", "notes": "better"},
+        {
+            "date": "2026-11-20",
+            "discipline": "sport",
+            "result": "dogged",
+            "rests": "4",
+            "notes": "better",
+        },
     )
     ascent.refresh_from_db()
 
@@ -92,7 +98,7 @@ def test_discipline_change_that_invalidates_the_result_needs_a_new_result(
     response = post(
         signed_in_client,
         f"/ascents/{ascent.pk}/edit/",
-        {"discipline": "top_rope", "result": "redpoint"},
+        {"date": "2026-11-20", "discipline": "top_rope", "result": "redpoint"},
     )
     ascent.refresh_from_db()
 
@@ -110,7 +116,12 @@ def test_rests_are_cleared_when_result_is_no_longer_dogged(
     post(
         signed_in_client,
         f"/ascents/{ascent.pk}/edit/",
-        {"discipline": "top_rope", "result": "onsight", "rests": "2"},
+        {
+            "date": "2026-11-20",
+            "discipline": "top_rope",
+            "result": "onsight",
+            "rests": "2",
+        },
     )
     ascent.refresh_from_db()
 
@@ -125,7 +136,12 @@ def test_edit_rejects_bad_rests(signed_in_client: Client, session: int, rests: s
     response = post(
         signed_in_client,
         f"/ascents/{ascent.pk}/edit/",
-        {"discipline": "top_rope", "result": "dogged", "rests": rests},
+        {
+            "date": "2026-11-20",
+            "discipline": "top_rope",
+            "result": "dogged",
+            "rests": rests,
+        },
     )
     ascent.refresh_from_db()
 
@@ -155,19 +171,3 @@ def test_confirmed_delete_removes_the_ascent_but_keeps_the_route(
     assert response["Location"] == f"/sessions/{session}/"
     assert Ascent.objects.count() == 0
     assert Route.objects.count() == 1
-
-
-@pytest.mark.django_db
-def test_editing_an_ascent_on_a_non_indoor_session_is_not_found(
-    signed_in_client: Client, session: int
-):
-    ascent = dogged_rope(signed_in_client, session)
-    Session.objects.filter(pk=session).update(indoor_outdoor="outdoor")
-
-    response = post(
-        signed_in_client,
-        f"/ascents/{ascent.pk}/edit/",
-        {"discipline": "sport", "result": "dogged"},
-    )
-
-    assert response.status_code == 404

@@ -2,7 +2,7 @@
 {% block title %}Delete Session - The Logbook{% endblock %}
 {% block content %}
   <h1>Delete this Session?</h1>
-  <p>{{ session.date|date:"Y-m-d" }} {{ session.get_activity_type_display }}{% if session.location %} at {{ session.location }}{% endif %}</p>
+  <p>{{ session }}{% with gyms=session.gyms %}{% if gyms %} &middot; {{ gyms|join:", " }}{% endif %}{% endwith %}</p>
   {% if ascent_count %}<p>This will also delete its {{ ascent_count }} Ascent{{ ascent_count|pluralize }}. The Routes are kept.</p>{% endif %}
   <form method="post">
     {% csrf_token %}

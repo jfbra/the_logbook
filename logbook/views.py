@@ -1,6 +1,6 @@
 from django.db import IntegrityError
-from django.db.models import Count, ProtectedError
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadRequest
+from django.db.models import Count, ProtectedError, prefetch_related_objects
+from django.http import HttpRequest, HttpResponse
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -15,16 +15,16 @@ from .forms import (
     route_by_id,
     routes_at,
 )
-from .models import Gym, IndoorAscent, IndoorRoute, Session, Setting
+from .models import Gym, IndoorAscent, IndoorRoute, Session
 from .weekly import weekly_totals
 
 
 def session_list(request: HttpRequest) -> HttpResponse:
     totals = weekly_totals()
     context = {
-        "sessions": Session.objects.annotate(ascent_count=Count("ascents")).order_by(
-            "-date", "-id"
-        ),
+        "sessions": Session.objects.annotate(ascent_count=Count("ascents"))
+        .prefetch_related("ascents__route__gym")
+        .order_by("-date", "-id"),
         "this_week_minutes": totals.this_week,
         "last_week_minutes": totals.last_week,
     }
@@ -43,13 +43,9 @@ def _session_form_view(
 
 
 def _ascent_context(session: Session, form) -> dict:
-    if form is None and session.indoor_outdoor == Setting.INDOOR:
-        form = AscentForm(session=session)
-    return {
-        "session": session,
-        "form": form,
-        "ascents": session.ascents.select_related("route__gym"),  # pyright: ignore[reportAttributeAccessIssue]
-    }
+    # Called after any save, so the prefetched Ascents include a new one.
+    prefetch_related_objects([session], "ascents__route__gym")
+    return {"session": session, "form": form or AscentForm(session=session)}
 
 
 def session_detail(request: HttpRequest, pk: int) -> HttpResponse:
@@ -62,8 +58,6 @@ def session_detail(request: HttpRequest, pk: int) -> HttpResponse:
 @require_POST
 def ascent_create(request: HttpRequest, pk: int) -> HttpResponse:
     session = get_object_or_404(Session, pk=pk)
-    if session.indoor_outdoor != Setting.INDOOR:
-        return HttpResponseBadRequest("Ascents can only be added to indoor Sessions.")
     form = AscentForm(request.POST, session=session)
     if form.is_valid():
         form.save()
@@ -91,26 +85,20 @@ def session_delete(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         session.delete()
         return redirect("session_list")
+    prefetch_related_objects([session], "ascents__route__gym")
     context = {"session": session, "ascent_count": session.ascents.count()}  # pyright: ignore[reportAttributeAccessIssue]
     return render(request, "logbook/session_confirm_delete.html", context)
 
 
-def _indoor_session_or_404(pk: int) -> Session:
-    session = get_object_or_404(Session, pk=pk)
-    if session.indoor_outdoor != Setting.INDOOR:
-        raise Http404("Ascents can only be added to indoor Sessions.")
-    return session
-
-
 def route_search(request: HttpRequest, pk: int) -> HttpResponse:
     """Candidate Routes at the named Gym, with grade, colour, set date, last result."""
-    session = _indoor_session_or_404(pk)
+    session = get_object_or_404(Session, pk=pk)
     gym = request.GET.get("gym", "").strip()
     query = request.GET.get("name", "").strip()
     candidates: list[tuple[IndoorRoute, IndoorAscent | None]] = []
     if gym and query:
         for route in routes_at(gym, query)[:10]:
-            last = route.ascents.order_by("-created_at", "-id").first()  # pyright: ignore[reportAttributeAccessIssue]
+            last = route.ascents.order_by("-date", "-created_at", "-id").first()  # pyright: ignore[reportAttributeAccessIssue]
             candidates.append((route, last))
     context = {"session": session, "candidates": candidates, "query": query}
     return render(request, "logbook/_route_matches.html", context)
@@ -118,9 +106,10 @@ def route_search(request: HttpRequest, pk: int) -> HttpResponse:
 
 def ascent_form(request: HttpRequest, pk: int) -> HttpResponse:
     """The quick-add section with an existing Route chosen (or cleared)."""
-    session = _indoor_session_or_404(pk)
+    session = get_object_or_404(Session, pk=pk)
     route = route_by_id(request.GET.get("route"))
-    form = AscentForm(session=session, route=route)
+    date = request.GET.get("date", "")
+    form = AscentForm(session=session, route=route, date=date)
     return render(request, "logbook/_ascents.html", _ascent_context(session, form))
 
 
@@ -128,8 +117,6 @@ def ascent_edit(request: HttpRequest, pk: int) -> HttpResponse:
     ascent = get_object_or_404(
         IndoorAscent.objects.select_related("session", "route__gym"), pk=pk
     )
-    if ascent.session.indoor_outdoor != Setting.INDOOR:
-        raise Http404("Ascents can only be edited on indoor Sessions.")
     form = AscentEditForm(
         request.POST if request.method == "POST" else None, instance=ascent
     )

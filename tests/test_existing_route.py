@@ -12,7 +12,7 @@ from .test_session_detail import log_session
 
 @pytest.fixture
 def indoor(signed_in_client: Client) -> int:
-    return log_session(signed_in_client, indoor_outdoor="indoor")
+    return log_session(signed_in_client)
 
 
 def search(client: Client, pk: int, name: str, gym: str = "Depot") -> str:
@@ -53,16 +53,6 @@ def test_search_at_an_unknown_gym_finds_nothing(signed_in_client: Client, indoor
     add(signed_in_client, indoor, name="Blue Cave")
 
     assert "Blue Cave" not in search(signed_in_client, indoor, "blue", gym="Nowhere")
-
-
-@pytest.mark.django_db
-def test_search_rejects_non_indoor_sessions(signed_in_client: Client):
-    pk = log_session(signed_in_client, indoor_outdoor="outdoor")
-
-    assert (
-        get(signed_in_client, f"/sessions/{pk}/routes/search/?name=a").status_code
-        == 404
-    )
 
 
 @pytest.mark.django_db

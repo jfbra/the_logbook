@@ -1,44 +1,43 @@
 <section id="ascents">
   <h2>Ascents</h2>
-  {% if session.indoor_outdoor == "indoor" %}
-    {% if ascents %}
-      <ul>
-        {% for ascent in ascents %}
-          <li><a href="{% url 'ascent_edit' ascent.pk %}">Edit</a> <a href="{% url 'route_edit' ascent.route_id %}">{{ ascent.route.name }}</a>{% if ascent.route.grade %} ({{ ascent.route.grade }}){% endif %} &middot; {{ ascent.route.gym.name }} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}{% if ascent.rests %} &middot; {{ ascent.rests }} rest{{ ascent.rests|pluralize }}{% endif %}{% if ascent.notes %} &mdash; {{ ascent.notes }}{% endif %}</li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>No Ascents yet.</p>
-    {% endif %}
-    <form method="post" action="{% url 'ascent_create' session.pk %}" hx-post="{% url 'ascent_create' session.pk %}" hx-target="#ascents" hx-swap="outerHTML">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-      {% if form.chosen %}
-        {{ form.route }}
-        <p><strong>{{ form.chosen.name }}</strong>{% if form.chosen.grade %} ({{ form.chosen.grade }}){% endif %} &middot; {{ form.chosen.gym.name }} &middot; {{ form.chosen.get_route_type_display }}
-          <a class="button" href="{% url 'ascent_form' session.pk %}" hx-get="{% url 'ascent_form' session.pk %}" hx-target="#ascents" hx-swap="outerHTML">Change route</a></p>
-        {{ form.discipline.as_field_group }}
-        {{ form.result.as_field_group }}
-        {{ form.rests.as_field_group }}
-        {{ form.notes.as_field_group }}
-      {% else %}
-        {{ form.route }}
-        {{ form.gym.as_field_group }}
-        {{ form.name.as_field_group }}
-        <div id="route-matches"></div>
-        {{ form.route_type.as_field_group }}
-        {{ form.grade.as_field_group }}
-        {{ form.grade_system.as_field_group }}
-        {{ form.discipline.as_field_group }}
-        {{ form.result.as_field_group }}
-        {{ form.rests.as_field_group }}
-        {{ form.notes.as_field_group }}
-      {% endif %}
-      <button class="primary" type="submit">Add Ascent</button>
-    </form>
-  {% elif session.indoor_outdoor == "outdoor" %}
-    <p>Outdoor Ascents are not available yet.</p>
+  {% with ascents=session.ascents.all gyms=session.gyms %}
+  {% if gyms %}<p>Gyms: {{ gyms|join:", " }}</p>{% endif %}
+  {% if ascents %}
+    <ul>
+      {% for ascent in ascents %}
+        <li><a href="{% url 'ascent_edit' ascent.pk %}">Edit</a> {% if session.end_date %}{{ ascent.date|date:"Y-m-d" }} &middot; {% endif %}<a href="{% url 'route_edit' ascent.route_id %}">{{ ascent.route.name }}</a>{% if ascent.route.grade %} ({{ ascent.route.grade }}){% endif %} &middot; {{ ascent.route.gym.name }} &middot; {{ ascent.get_discipline_display }} &middot; {{ ascent.get_result_display }}{% if ascent.rests %} &middot; {{ ascent.rests }} rest{{ ascent.rests|pluralize }}{% endif %}{% if ascent.notes %} &mdash; {{ ascent.notes }}{% endif %}</li>
+      {% endfor %}
+    </ul>
   {% else %}
-    <p>Set this Session as indoor or outdoor to log Ascents. <a href="{% url 'session_edit' session.pk %}">Edit this Session</a></p>
+    <p>No Ascents yet.</p>
   {% endif %}
+  {% endwith %}
+  <form method="post" action="{% url 'ascent_create' session.pk %}" hx-post="{% url 'ascent_create' session.pk %}" hx-target="#ascents" hx-swap="outerHTML">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% if form.chosen %}
+      {{ form.route }}
+      <p><strong>{{ form.chosen.name }}</strong>{% if form.chosen.grade %} ({{ form.chosen.grade }}){% endif %} &middot; {{ form.chosen.gym.name }} &middot; {{ form.chosen.get_route_type_display }}
+        <a class="button" href="{% url 'ascent_form' session.pk %}" hx-get="{% url 'ascent_form' session.pk %}" hx-include="#id_date" hx-target="#ascents" hx-swap="outerHTML">Change route</a></p>
+      {{ form.date.as_field_group }}
+      {{ form.discipline.as_field_group }}
+      {{ form.result.as_field_group }}
+      {{ form.rests.as_field_group }}
+      {{ form.notes.as_field_group }}
+    {% else %}
+      {{ form.route }}
+      {{ form.gym.as_field_group }}
+      {{ form.name.as_field_group }}
+      <div id="route-matches"></div>
+      {{ form.route_type.as_field_group }}
+      {{ form.grade.as_field_group }}
+      {{ form.grade_system.as_field_group }}
+      {{ form.date.as_field_group }}
+      {{ form.discipline.as_field_group }}
+      {{ form.result.as_field_group }}
+      {{ form.rests.as_field_group }}
+      {{ form.notes.as_field_group }}
+    {% endif %}
+    <button class="primary" type="submit">Add Ascent</button>
+  </form>
 </section>
